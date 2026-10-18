@@ -357,54 +357,37 @@ app.post('/api/chat', async (req, res) => {
   if (/\b(liga|ligar|ligue|acende|desliga|desligar|apaga)\b/i.test(texto) && /\b(luz|lâmpada|lampada|tv|televis|tomada|ar.?condicionado|ventilador|abajur)\b/i.test(texto) && !casa.listar().length)
     return res.json({ fala: `${NOME_DONO[0].toUpperCase() + NOME_DONO.slice(1)}, ainda não cadastrei seus aparelhos. Abra a tela "Casa" (botão da casinha) e adicione a luz, a TV e o que mais quiser controlar.`, acao: null, cerebro: 'casa' });
 
-  // 1) Muse, se estiver conectado lendo a fila
+  // 1) IAs rápidas primeiro (Groq responde em ~2s); Muse como reserva
+  // (o Muse via fila leva 10-40s — lento demais para ser o primeiro)
+  const cerebrosRapidos = cerebrosDisponiveis();
+  for (const c of cerebrosRapidos) {
+    try {
+      log('🧠 tentando:', c.nome);
+      const r = await pensarComFerramentas(c, [{ role: 'user', content: texto }]);
+      if (r && r.fala) {
+        log('🧠', c.nome + ':', r.fala.slice(0, 80));
+        return res.json({ fala: r.fala, acao: r.acao || null, cerebro: c.nome });
+      }
+    } catch (e) { log('⚠️ ', c.nome, 'falhou:', e.message); }
+  }
+
+  // 2) Muse como reserva, se estiver conectado lendo a fila
   if (museOnline()) {
     const r = await esperarMuse(enfileirar(texto), Number(process.env.MUSE_ESPERA_MS || 25000));
     if (r && r.response) {
       log('🧠 muse:', r.response);
       return res.json({ fala: r.response, acao: r.control || null, audio_url: r.audio_url || null, cerebro: 'muse' });
     }
-    log('⚠️  Muse não respondeu a tempo, usando IA reserva');
+    log('⚠️  Muse não respondeu a tempo');
   }
 
-  const rapida = respostaRapida(texto);
-  const cerebros = cerebrosDisponiveis();
-  if (!cerebros.length) {
-    if (rapida) return res.json({ ...rapida, cerebro: 'local' });
-    return res.json({
-      fala: `${NOME_DONO[0].toUpperCase() + NOME_DONO.slice(1)}, meu cérebro está desligado. Configure a chave GROQ_API_KEY para eu poder pensar.`,
-      acao: null, cerebro: 'nenhum', erro: 'sem_chave'
-    });
-  }
-
-  // 2) IAs reserva, em ordem, até uma funcionar
-  const msgs = montarMensagens(texto, history);
-  let ultimoErro = '';
-  for (const c of cerebros) {
-    try {
-      const r = await pensarComFerramentas(c, msgs);
-      let fala = String(r?.fala || r?.resposta || r?.response || '').trim();
-      // ação de casa vinda do cérebro: executa no servidor
-      if (r.acao && r.acao.tipo === 'casa') {
-        const rc = await casa.acionar(r.acao.acao, r.acao.alvo || r.acao.aparelho || 'tudo');
-        const fc = falaCasa(rc, { acao: r.acao.acao, alvo: r.acao.alvo });
-        return res.json({ ...fc, cerebro: c.nome });
-      }
-      if (!fala) throw new Error('resposta vazia');
-      log(`🧠 ${c.nome}:`, fala, r.acao ? JSON.stringify(r.acao) : '');
-      return res.json({ fala, acao: r.acao || null, cerebro: c.nome, ferramentas: r.ferramentas });
-    } catch (e) {
-      ultimoErro = `${c.nome}: ${e.message}`;
-      log('❌', ultimoErro);
-    }
-  }
-  if (rapida) return res.json({ ...rapida, cerebro: 'local' });
-  const det = ultimoErro || groqErro || '';
-  const chaveRuim = /401|invalid|api key|unauthor|no api key/i.test(det);
-  const falaErro = chaveRuim
-    ? `${NOME_DONO[0].toUpperCase() + NOME_DONO.slice(1)}, minha chave de acesso foi recusada. Confira a GROQ_API_KEY.`
-    : `Desculpe, ${NOME_DONO}, meu cérebro não respondeu. Tente de novo em instantes.`;
-  res.json({ fala: falaErro, acao: null, cerebro: 'erro', erro: chaveRuim ? 'chave_invalida' : 'falha', detalhe: det });
+  // 3) nenhuma IA respondeu: fallback local
+  const rapida2 = respostaRapida(texto);
+  if (rapida2) return res.json({ ...rapida2, cerebro: 'local' });
+  return res.json({
+    fala: `Desculpe, ${NOME_DONO}, meu cérebro não respondeu. Tente de novo em instantes.`,
+    acao: null, cerebro: 'erro', erro: 'falha'
+  });
 });
 
 // ═══════════════════════════════════════════════════════════════
@@ -702,7 +685,7 @@ app.get('/api/health', (req, res) => {
     onde: NA_NUVEM ? 'nuvem' : 'computador',
     dono: NOME_DONO,
     muse: { conectado: museOnline(), pedidos_na_fila: fila.size },
-    cerebro: museOnline() ? 'muse' : (cerebros[0] || 'nenhum'),
+    cerebro: cerebros[0] || 'nenhum',
     cerebros_reserva: cerebros,
     voz_piper: piperExiste(),
     voz_motor: vozMotor(),
