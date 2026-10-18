@@ -689,3 +689,5 @@ app.listen(PORTA, () => {
   console.log(`  Cérebro  : ${c.length ? c.join(' → ') : 'NENHUMA CHAVE — configure GROQ_API_KEY no arquivo .env'} (Muse entra quando conectado)`);
   console.log(`  Voz      : ${piperExiste() ? 'Piper Faber PT-BR' : 'voz do navegador (Piper não encontrado)'}\n`);
 });
+
+// deploy-forcado 1792358107
