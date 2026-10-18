@@ -55,6 +55,30 @@ app.get('/api/muse-brain/queue', (req, res) => {
   res.json(readQueue().filter(x => x.status === 'pending'));
 });
 
+// Enfileira e retorna o ID imediatamente (sem long-polling)
+app.post('/api/muse-brain/async', (req, res) => {
+  const { text, language } = req.body || {};
+  if (!text) return res.status(400).json({ error: 'text required' });
+  const id = Math.random().toString(36).slice(2, 10);
+  const q = readQueue();
+  q.push({ id, text, language: language || 'BR', ts: Date.now(), status: 'pending' });
+  writeQueue(q);
+  res.json({ id });
+});
+
+// Verifica se a resposta está pronta
+app.get('/api/muse-brain/result/:id', (req, res) => {
+  try {
+    const r = JSON.parse(fs.readFileSync(resFile(req.params.id), 'utf8'));
+    fs.unlinkSync(resFile(req.params.id));
+    const nq = readQueue().filter(x => x.id !== req.params.id);
+    writeQueue(nq);
+    return res.json({ ready: true, ...r });
+  } catch {
+    return res.json({ ready: false });
+  }
+});
+
 app.post('/api/muse-brain/respond', (req, res) => {
   const { id, response, audio_url, control } = req.body || {};
   if (!id) return res.status(400).json({ error: 'id required' });
