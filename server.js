@@ -388,7 +388,7 @@ app.post('/api/chat', async (req, res) => {
 
   // 1) MUSE (eu, o Jarvis) — cérebro principal
   if (museOnline()) {
-    const r = await esperarMuse(enfileirar(texto), Number(process.env.MUSE_ESPERA_MS || 30000));
+    const r = await esperarMuse(enfileirar(texto), Number(process.env.MUSE_ESPERA_MS || 45000));
     if (r && r.response) {
       log('🧠 muse:', r.response);
       return res.json({ fala: r.response, acao: r.control || null, audio_url: r.audio_url || null, cerebro: 'muse' });
