@@ -568,7 +568,8 @@ async function falar(texto, audioUrl) {
     let url = audioUrl, local = false;
     // modo ligação (mic ativo): conversa precisa de velocidade — pula minha voz lenta
     // modo texto: usa minha voz clonada (qualidade)
-    if (!url && !ativo) url = await minhaVoz(texto, 20000); // minha voz (ponte XTTS), até 20s; sem ponte, cai rápido p/ Piper
+    // ponte de voz desligada (sem o monitor, ninguém processa a fila); vai direto ao Piper rápido
+    // if (!url && !ativo) url = await minhaVoz(texto, 20000);
     if (!url && saude.voz_motor && saude.voz_motor !== 'navegador') {
       const r = await fetch('/api/tts', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ text: texto }) });
       if (!r.ok) throw new Error('tts');
