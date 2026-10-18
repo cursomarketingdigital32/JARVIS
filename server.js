@@ -237,7 +237,7 @@ async function chatClaude(chave, modelo, msgs) {
 function cerebrosDisponiveis() {
   const lista = [];
   if (process.env.GROQ_API_KEY) lista.push({ nome: 'groq', fn: chatGroq });
-  if (process.env.GEMINI_API_KEY) lista.push({ nome: 'gemini', fn: m => chatGemini(process.env.GEMINI_API_KEY, process.env.GEMINI_MODELO || 'gemini-2.5-flash', m) });
+  if (process.env.GEMINI_API_KEY) lista.push({ nome: 'gemini', fn: m => chatGemini(process.env.GEMINI_API_KEY, process.env.GEMINI_MODELO || 'gemini-3.8-flash', m) });
   if (process.env.ANTHROPIC_API_KEY) lista.push({ nome: 'claude', fn: m => chatClaude(process.env.ANTHROPIC_API_KEY, process.env.CLAUDE_MODELO || 'claude-3-5-sonnet-latest', m) });
   if (process.env.OPENAI_API_KEY) lista.push({ nome: 'openai', fn: m => chatEstiloOpenAI(process.env.OPENAI_URL || 'https://api.openai.com/v1/chat/completions', process.env.OPENAI_API_KEY, process.env.OPENAI_MODELO || 'gpt-4o-mini', m) });
   // escolha do cérebro principal (CEREBRO_PRINCIPAL=gemini deixa o Gemini na frente)
