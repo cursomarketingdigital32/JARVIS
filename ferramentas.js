@@ -43,6 +43,24 @@ const COORDS_CONHECIDAS = {
   'sao jose dos campos': { latitude: -23.17944, longitude: -45.88694, name: 'São José dos Campos', admin1: 'São Paulo' }
 };
 export async function clima(cidade) {
+  try { return await climaOpenMeteo(cidade); }
+  catch (e) { return await climaWttr(cidade); }
+}
+// wttr.in (sem chave) — reserva quando o Open-Meteo limita o IP
+const WTTR_PT = { 'clear': 'céu limpo', 'sunny': 'ensolarado', 'partly cloudy': 'parcialmente nublado', 'cloudy': 'nublado', 'overcast': 'encoberto', 'mist': 'neblina', 'fog': 'nevoeiro', 'patchy rain nearby': 'chuva fraca próxima', 'patchy rain possible': 'possível chuva fraca', 'light rain': 'chuva fraca', 'moderate rain': 'chuva moderada', 'heavy rain': 'chuva forte', 'light drizzle': 'garoa fraca', 'thundery outbreaks possible': 'possíveis trovoadas' };
+const wPt = s => WTTR_PT[String(s || '').toLowerCase()] || String(s || '');
+async function climaWttr(cidade) {
+  cidade = String(cidade || '').trim() || process.env.CIDADE_PADRAO || 'São José dos Campos';
+  const d = await pegar(`https://wttr.in/${encodeURIComponent(cidade)}?format=j1`);
+  const a = d.current_condition[0], h = d.weather[0], m = d.weather[1];
+  const dia = (w) => ({ max: Number(w.maxtempC), min: Number(w.mintempC), condicao: wPt(w.hourly[Math.min(4, w.hourly.length - 1)].weatherDesc[0].value) });
+  return {
+    cidade,
+    agora: { temperatura: Number(a.temp_C), sensacao: Number(a.FeelsLikeC), umidade: Number(a.humidity), vento_kmh: Math.round(Number(a.windspeedKmph)), condicao: wPt(a.weatherDesc[0].value) },
+    hoje: dia(h), amanha: dia(m), fonte: 'wttr.in'
+  };
+}
+async function climaOpenMeteo(cidade) {
   cidade = String(cidade || '').trim() || process.env.CIDADE_PADRAO || 'São José dos Campos';
   let geo = cacheGeo.get(cidade.toLowerCase());
   if (!geo) {
@@ -72,12 +90,45 @@ export async function clima(cidade) {
 const NOMES_MOEDA = { dolar: 'USD', 'dólar': 'USD', usd: 'USD', euro: 'EUR', eur: 'EUR', bitcoin: 'BTC', btc: 'BTC', libra: 'GBP', gbp: 'GBP',
   iene: 'JPY', ethereum: 'ETH', eth: 'ETH', peso: 'ARS', 'peso argentino': 'ARS', 'dolar canadense': 'CAD', 'franco suico': 'CHF', yuan: 'CNY' };
 export async function cotacao(moedas) {
+  try { return await cotacaoAwesome(moedas); }
+  catch { return await cotacaoReserva(moedas); }
+}
+async function cotacaoAwesome(moedas) {
   let lista = (Array.isArray(moedas) ? moedas : String(moedas || 'dolar,euro,bitcoin').split(/\s*(?:,|;|\se\s)\s*/))
     .map(m => NOMES_MOEDA[String(m).trim().toLowerCase()] || String(m).trim().toUpperCase()).filter(m => /^[A-Z]{3}$/.test(m));
   if (!lista.length) lista = ['USD', 'EUR', 'BTC'];
   const d = await pegar(`https://economia.awesomeapi.com.br/json/last/${[...new Set(lista)].map(m => m + '-BRL').join(',')}`);
   const saida = {};
   for (const k in d) saida[d[k].code] = { nome: d[k].name.split('/')[0], valor_reais: Number(d[k].bid), variacao_pct: Number(d[k].pctChange) };
+  return saida;
+}
+// reserva quando a AwesomeAPI limita o IP: er-api (moedas) + CoinGecko (cripto)
+const NOMES_CRIPTO = { BTC: 'bitcoin', ETH: 'ethereum' };
+async function cotacaoReserva(moedas) {
+  let lista = (Array.isArray(moedas) ? moedas : String(moedas || 'dolar,euro,bitcoin').split(/\s*(?:,|;|\se\s)\s*/))
+    .map(m => NOMES_MOEDA[String(m).trim().toLowerCase()] || String(m).trim().toUpperCase()).filter(m => /^[A-Z]{3}$/.test(m));
+  if (!lista.length) lista = ['USD', 'EUR', 'BTC'];
+  lista = [...new Set(lista)];
+  const fiat = lista.filter(m => !NOMES_CRIPTO[m]);
+  const cripto = lista.filter(m => NOMES_CRIPTO[m]);
+  const saida = {};
+  if (fiat.length) {
+    const d = await pegar('https://open.er-api.com/v6/latest/USD');
+    const usdBrl = d.rates.BRL;
+    for (const m of fiat) {
+      if (m === 'USD') saida.USD = { nome: 'Dólar', valor_reais: usdBrl };
+      else if (d.rates[m]) saida[m] = { nome: m, valor_reais: usdBrl / d.rates[m] };
+    }
+  }
+  if (cripto.length) {
+    const ids = cripto.map(m => NOMES_CRIPTO[m]).join(',');
+    const d = await pegar(`https://api.coingecko.com/api/v3/simple/price?ids=${ids}&vs_currencies=brl&include_24hr_change=true`);
+    for (const m of cripto) {
+      const info = d[NOMES_CRIPTO[m]];
+      if (info) saida[m] = { nome: m === 'BTC' ? 'Bitcoin' : 'Ethereum', valor_reais: info.brl, variacao_pct: info.brl_24h_change };
+    }
+  }
+  if (!Object.keys(saida).length) throw new Error('cotações indisponíveis');
   return saida;
 }
 
