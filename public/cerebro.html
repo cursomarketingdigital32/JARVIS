@@ -191,6 +191,21 @@ function loop() {
   setTimeout(() => { try { if (rec.state === 'recording') rec.stop(); } catch {} }, 5000);
 }
 
+function fallbackVoz(texto) {
+  try {
+    const u = new SpeechSynthesisUtterance(texto);
+    u.lang = 'pt-BR';
+    u.onend = () => {
+      energy = 0.9;
+      if (ativo) { statusEl.textContent = 'ouvindo...'; loop(); }
+    };
+    speechSynthesis.speak(u);
+  } catch {
+    energy = 0.9;
+    if (ativo) { statusEl.textContent = 'ouvindo...'; loop(); }
+  }
+}
+
 async function send() {
   if (!ativo) return;
   const blob = new Blob(chunks, { type: 'audio/webm' });
@@ -204,7 +219,7 @@ async function send() {
     const d = await r.json();
     const txt = (d.text || '').trim();
     if (!txt) { statusEl.textContent = 'ouvindo...'; energy = 0.9; loop(); return; }
-    statusEl.textContent = 'pensando...';
+    statusEl.textContent = 'Você: ' + txt;
     const r2 = await fetch('/api/muse-brain', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -213,25 +228,22 @@ async function send() {
     const d2 = await r2.json();
     const resp = (d2.response || '').trim();
     if (resp) {
-      statusEl.textContent = 'falando...';
+      statusEl.textContent = 'Jarvis: ' + resp;
       energy = 1.0;
-      let au;
-      if (d2.audio_url) {
-        au = new Audio(d2.audio_url);
-      } else {
-        const r3 = await fetch('/api/piper-tts', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ text: resp, voice: 'faber' })
-        });
-        const ab = await r3.blob();
-        au = new Audio(URL.createObjectURL(ab));
-      }
-      au.onended = () => {
-        energy = 0.9;
-        if (ativo) { statusEl.textContent = 'ouvindo...'; loop(); }
+      const tocar = (url) => {
+        const au = new Audio(url);
+        au.onended = () => {
+          energy = 0.9;
+          if (ativo) { statusEl.textContent = 'ouvindo...'; loop(); }
+        };
+        au.onerror = () => fallbackVoz(resp);
+        au.play().catch(() => fallbackVoz(resp));
       };
-      au.play();
+      if (d2.audio_url) {
+        tocar(d2.audio_url);
+      } else {
+        fallbackVoz(resp);
+      }
     } else {
       statusEl.textContent = 'ouvindo...';
       energy = 0.9;
