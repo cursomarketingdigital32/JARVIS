@@ -1,3 +1,4 @@
+
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
@@ -460,6 +461,8 @@ async function processar(texto, deVoz) {
     if (acaoTela) { if (!d.acao.pergunta) d.acao.pergunta = texto; await executarAcao(d.acao); }
     janelaConversa = Date.now() + 12000;
     if (d.erro === 'sem_chave') legendaJarvis('Configure a chave GROQ_API_KEY (grátis em console.groq.com) — veja o arquivo LEIA-ME.', true);
+    else if (d.erro === 'chave_invalida') legendaJarvis('A GROQ_API_KEY foi recusada. Gere uma nova em console.groq.com/keys e atualize no Render.', true);
+    else if (d.cerebro === 'erro' && d.detalhe) legendaJarvis('Detalhe técnico: ' + d.detalhe, true);
   } catch (e) {
     legendaJarvis('Sem conexão com o servidor do Jarvis. Tentando de novo em instantes.', true);
     await new Promise(r => setTimeout(r, 1500));

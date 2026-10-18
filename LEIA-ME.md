@@ -1,3 +1,4 @@
+
 # J.A.R.V.I.S. 2.0 — conserto completo
 
 ## O que estava quebrado
@@ -108,7 +109,14 @@ O Jarvis é compatível com o Muse. No Muse, mande esta instrução (troque o en
 
 Enquanto o Muse estiver lendo a fila, o painel mostra **CÉREBRO: MUSE**. Se ele parar de responder ou demorar mais de 25 s, o Groq assume na hora e o Jarvis nunca mais trava — foi exatamente esse travamento que quebrava o seu Jarvis antigo.
 
+## Deixar o cérebro mais inteligente
+Por padrão ele pensa com o Groq (grátis e rápido). Para ficar mais esperto:
+- **Modelo mais forte no Groq:** adicione a variável `GROQ_MODELO` = `meta-llama/llama-4-maverick-17b-128e-instruct`.
+- **Usar o Gemini** (tem plano grátis e é bem inteligente): crie a chave em aistudio.google.com/apikey, adicione `GEMINI_API_KEY` e `CEREBRO_PRINCIPAL=gemini`.
+
 ## Problemas comuns
+- **"Falha nos circuitos" / "chave recusada":** a `GROQ_API_KEY` está errada ou colada com espaço. Gere outra em console.groq.com/keys, apague a variável no Render e cadastre de novo (sem espaços), depois **Manual Deploy**. A tela mostra o motivo técnico embaixo da resposta.
+- **Deu certo no teste mas o primeiro acesso falha:** no plano grátis o Render "dorme". Espere ~50s, recarregue e tente de novo.
 - **"Permita o uso do microfone"**: toque no cadeado ao lado do endereço e libere o **Microfone**.
 - **Não ouve no Brave, Opera ou Firefox**: esses navegadores não têm reconhecimento de voz. O Jarvis troca sozinho para o Whisper, que precisa da `GROQ_API_KEY`. Use o Chrome ou o Edge.
 - **"Meu cérebro está desligado"**: falta configurar a `GROQ_API_KEY`.

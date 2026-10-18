@@ -1,3 +1,4 @@
+
 // ═══════════════════════════════════════════════════════════════
 //  J.A.R.V.I.S. — servidor único (roda no PC e na nuvem / Render)
 //  - Cérebro: Muse (se estiver conectado) → Groq → Gemini → OpenAI
@@ -28,7 +29,7 @@ try {
 
 const NA_NUVEM = !!(process.env.RENDER || process.env.NA_NUVEM);
 const NOME_DONO = process.env.NOME_DONO || 'senhor';
-const CIDADE = process.env.CIDADE_PADRAO || 'Maceió';
+const CIDADE = process.env.CIDADE_PADRAO || 'São José dos Campos';
 
 const app = express();
 app.set('trust proxy', true);
@@ -86,8 +87,13 @@ Sem ação: "acao": null.`;
 //  o Jarvis usa a IA reserva (Groq/Gemini/OpenAI) e não trava mais.
 // ═══════════════════════════════════════════════════════════════
 const fila = new Map();       // id -> pedido
-const respostas = new Map();  // id -> resposta
+const respostas = new Map();  // id -> { response, audio_url, control, ts }
 let ultimaLeituraMuse = 0;
+// limpa respostas atrasadas que ninguém buscou (a cada 5 min, remove as com +10 min)
+setInterval(() => {
+  const agora = Date.now();
+  for (const [k, v] of respostas) if (agora - (v.ts || 0) > 600000) respostas.delete(k);
+}, 300000);
 const museOnline = () => process.env.MUSE_MODO !== 'desligado' && Date.now() - ultimaLeituraMuse < 30000;
 const novoId = () => Math.random().toString(36).slice(2, 10);
 
@@ -118,7 +124,7 @@ app.post('/api/muse-brain/respond', (req, res) => {
   const { id, response, audio_url, control } = req.body || {};
   if (!id) return res.status(400).json({ error: 'id required' });
   ultimaLeituraMuse = Date.now();
-  respostas.set(id, { response, audio_url, control });
+  respostas.set(id, { response, audio_url, control, ts: Date.now() });
   fila.delete(id);
   res.json({ ok: true });
 });
@@ -133,7 +139,8 @@ app.get('/api/muse-brain/result/:id', (req, res) => {
   const r = respostas.get(req.params.id);
   if (!r) return res.json({ ready: false });
   respostas.delete(req.params.id);
-  res.json({ ready: true, ...r });
+  const { ts, ...limpa } = r;
+  res.json({ ready: true, ...limpa });
 });
 app.post('/api/muse-brain', async (req, res) => {
   const { text, language } = req.body || {};
@@ -163,13 +170,33 @@ function montarMensagens(texto, historico) {
 async function chatEstiloOpenAI(url, chave, modelo, msgs) {
   const r = await fetch(url, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${chave}` },
-    body: JSON.stringify({ model: modelo, messages: msgs, temperature: 0.7, max_tokens: 400, response_format: { type: 'json_object' } }),
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${(chave || '').trim()}` },
+    // sem response_format: alguns modelos rejeitam e derrubam tudo. lerJSON extrai o JSON do texto.
+    body: JSON.stringify({ model: modelo, messages: msgs, temperature: 0.7, max_tokens: 500 }),
     signal: AbortSignal.timeout(30000)
   });
   const d = await r.json().catch(() => ({}));
   if (!r.ok) throw new Error(d.error?.message || `HTTP ${r.status}`);
   return lerJSON(d.choices?.[0]?.message?.content);
+}
+
+// Groq com vários modelos: se um estiver fora do ar/descontinuado, tenta o próximo
+const GROQ_MODELOS = (process.env.GROQ_MODELO ? [process.env.GROQ_MODELO] : [])
+  .concat(['llama-3.3-70b-versatile', 'meta-llama/llama-4-maverick-17b-128e-instruct', 'llama-3.1-8b-instant', 'gemma2-9b-it']);
+let groqErro = '';
+async function chatGroq(msgs) {
+  let ultimo = '';
+  for (const modelo of [...new Set(GROQ_MODELOS)]) {
+    try { return await chatEstiloOpenAI('https://api.groq.com/openai/v1/chat/completions', process.env.GROQ_API_KEY, modelo, msgs); }
+    catch (e) {
+      ultimo = `${modelo}: ${e.message}`;
+      log('⚠️ groq', ultimo);
+      // chave inválida/sem crédito: não adianta tentar outro modelo
+      if (/401|invalid|api key|unauthor/i.test(e.message)) break;
+    }
+  }
+  groqErro = ultimo;
+  throw new Error(ultimo || 'groq falhou');
 }
 
 async function chatGemini(chave, modelo, msgs) {
@@ -192,9 +219,12 @@ async function chatGemini(chave, modelo, msgs) {
 
 function cerebrosDisponiveis() {
   const lista = [];
-  if (process.env.GROQ_API_KEY) lista.push({ nome: 'groq', fn: m => chatEstiloOpenAI('https://api.groq.com/openai/v1/chat/completions', process.env.GROQ_API_KEY, process.env.GROQ_MODELO || 'llama-3.3-70b-versatile', m) });
+  if (process.env.GROQ_API_KEY) lista.push({ nome: 'groq', fn: chatGroq });
   if (process.env.GEMINI_API_KEY) lista.push({ nome: 'gemini', fn: m => chatGemini(process.env.GEMINI_API_KEY, process.env.GEMINI_MODELO || 'gemini-2.5-flash', m) });
   if (process.env.OPENAI_API_KEY) lista.push({ nome: 'openai', fn: m => chatEstiloOpenAI(process.env.OPENAI_URL || 'https://api.openai.com/v1/chat/completions', process.env.OPENAI_API_KEY, process.env.OPENAI_MODELO || 'gpt-4o-mini', m) });
+  // escolha do cérebro principal (CEREBRO_PRINCIPAL=gemini deixa o Gemini na frente)
+  const pref = (process.env.CEREBRO_PRINCIPAL || '').toLowerCase();
+  if (pref) lista.sort((a, b) => (b.nome === pref) - (a.nome === pref));
   return lista;
 }
 
@@ -316,7 +346,12 @@ app.post('/api/chat', async (req, res) => {
     }
   }
   if (rapida) return res.json({ ...rapida, cerebro: 'local' });
-  res.json({ fala: `Desculpe, ${NOME_DONO}, tive uma falha nos meus circuitos de raciocínio. Tente de novo.`, acao: null, cerebro: 'erro', erro: ultimoErro });
+  const det = ultimoErro || groqErro || '';
+  const chaveRuim = /401|invalid|api key|unauthor|no api key/i.test(det);
+  const falaErro = chaveRuim
+    ? `${NOME_DONO[0].toUpperCase() + NOME_DONO.slice(1)}, minha chave de acesso foi recusada. Confira a GROQ_API_KEY.`
+    : `Desculpe, ${NOME_DONO}, meu cérebro não respondeu. Tente de novo em instantes.`;
+  res.json({ fala: falaErro, acao: null, cerebro: 'erro', erro: chaveRuim ? 'chave_invalida' : 'falha', detalhe: det });
 });
 
 // ═══════════════════════════════════════════════════════════════
@@ -410,20 +445,28 @@ app.post('/api/transcribe', upload.single('audio'), async (req, res) => {
   if (!chave) { apagar(); return res.status(503).json({ error: 'sem_chave', mensagem: 'Configure GROQ_API_KEY para transcrever áudio.' }); }
   if (!req.file) return res.status(400).json({ error: 'sem_audio' });
   try {
-    const fd = new FormData();
     const tipo = req.file.mimetype || 'audio/webm';
     const ext = tipo.includes('mp4') ? 'mp4' : tipo.includes('ogg') ? 'ogg' : tipo.includes('wav') ? 'wav' : 'webm';
-    fd.append('file', new Blob([fs.readFileSync(req.file.path)], { type: tipo }), `audio.${ext}`);
-    fd.append('model', process.env.WHISPER_MODELO || 'whisper-large-v3-turbo');
-    fd.append('language', 'pt');
-    fd.append('response_format', 'json');
-    const r = await fetch('https://api.groq.com/openai/v1/audio/transcriptions', {
-      method: 'POST', headers: { Authorization: `Bearer ${chave}` }, body: fd, signal: AbortSignal.timeout(30000)
-    });
-    const d = await r.json().catch(() => ({}));
+    const bytes = fs.readFileSync(req.file.path);
+    const modelos = [...new Set([process.env.WHISPER_MODELO, 'whisper-large-v3-turbo', 'whisper-large-v3'].filter(Boolean))];
+    let ultimo = '';
+    for (const modelo of modelos) {
+      const fd = new FormData();
+      fd.append('file', new Blob([bytes], { type: tipo }), `audio.${ext}`);
+      fd.append('model', modelo);
+      fd.append('language', 'pt');
+      fd.append('response_format', 'json');
+      const r = await fetch('https://api.groq.com/openai/v1/audio/transcriptions', {
+        method: 'POST', headers: { Authorization: `Bearer ${chave.trim()}` }, body: fd, signal: AbortSignal.timeout(30000)
+      });
+      const d = await r.json().catch(() => ({}));
+      if (r.ok) { apagar(); return res.json({ text: (d.text || '').trim() }); }
+      ultimo = d.error?.message || `HTTP ${r.status}`;
+      log('⚠️ whisper', modelo, ultimo);
+      if (/401|invalid|api key|unauthor/i.test(ultimo)) break;
+    }
     apagar();
-    if (!r.ok) return res.status(502).json({ error: 'groq_falhou', mensagem: d.error?.message || `HTTP ${r.status}` });
-    res.json({ text: (d.text || '').trim() });
+    return res.status(502).json({ error: 'groq_falhou', mensagem: ultimo });
   } catch (e) {
     apagar();
     res.status(500).json({ error: 'erro', mensagem: e.message });
