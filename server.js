@@ -93,7 +93,8 @@ Sem ação: "acao": null.`;
 const fila = new Map();       // id -> pedido
 const respostas = new Map();  // id -> resposta
 let ultimaLeituraMuse = 0;
-const museOnline = () => process.env.MUSE_MODO !== 'desligado' && Date.now() - ultimaLeituraMuse < 30000;
+// Padrão: MODO RÁPIDO (Muse desligado, cérebro é o Groq). Para usar o Muse, defina MUSE_MODO=ligado.
+const museOnline = () => process.env.MUSE_MODO === 'ligado' && Date.now() - ultimaLeituraMuse < 30000;
 const novoId = () => Math.random().toString(36).slice(2, 10);
 
 function enfileirar(text, language) {
@@ -148,43 +149,6 @@ app.post('/api/muse-brain', async (req, res) => {
 });
 
 // ═══════════════════════════════════════════════════════════════
-//  PONTE DE VOZ — a voz clonada do Jarvis no painel
-//  O painel pede POST /api/tts-voz {text} e aguarda em GET /api/tts-voz/:id.
-//  A VM do Jarvis lê GET /api/tts-voz/queue, gera o áudio e devolve via
-//  POST /api/tts-voz/:id {audio_url}.
-// ═══════════════════════════════════════════════════════════════
-const filaVoz = new Map(); // id -> { id, text, ts, audio_url }
-setInterval(() => {
-  const agora = Date.now();
-  for (const [k, v] of filaVoz) if (agora - v.ts > 600000) filaVoz.delete(k);
-}, 60000);
-function novoIdVoz() { return Math.random().toString(36).slice(2, 10); }
-app.post('/api/tts-voz', (req, res) => {
-  const text = String(req.body?.text || '').trim().slice(0, 500);
-  if (!text) return res.status(400).json({ error: 'texto vazio' });
-  if ([...filaVoz.values()].filter(j => !j.audio_url).length >= 5)
-    return res.status(429).json({ error: 'fila cheia' });
-  const id = novoIdVoz();
-  filaVoz.set(id, { id, text, ts: Date.now(), audio_url: null });
-  res.json({ id });
-});
-app.get('/api/tts-voz/queue', (req, res) => {
-  res.json([...filaVoz.values()].filter(j => !j.audio_url).map(j => ({ id: j.id, text: j.text })));
-});
-app.post('/api/tts-voz/:id', (req, res) => {
-  const j = filaVoz.get(req.params.id);
-  if (!j) return res.status(404).json({ error: 'job desconhecido' });
-  j.audio_url = String(req.body?.audio_url || '');
-  res.json({ ok: true });
-});
-app.get('/api/tts-voz/:id', (req, res) => {
-  const j = filaVoz.get(req.params.id);
-  if (!j) return res.status(404).json({ ready: false });
-  if (j.audio_url) { filaVoz.delete(req.params.id); return res.json({ ready: true, audio_url: j.audio_url }); }
-  res.json({ ready: false });
-});
-
-// ═══════════════════════════════════════════════════════════════
 //  CÉREBRO 2 — IAs reserva (qualquer uma que tiver chave)
 // ═══════════════════════════════════════════════════════════════
 function lerJSON(txt) {
@@ -217,7 +181,7 @@ async function chatEstiloOpenAI(url, chave, modelo, msgs) {
 
 // Groq com vários modelos: se um estiver fora do ar/descontinuado, tenta o próximo
 const GROQ_MODELOS = (process.env.GROQ_MODELO ? [process.env.GROQ_MODELO] : [])
-  .concat(['openai/gpt-oss-120b', 'openai/gpt-oss-20b', 'qwen/qwen3-32b']);
+  .concat(['llama-3.3-70b-versatile', 'meta-llama/llama-4-maverick-17b-128e-instruct', 'llama-3.1-8b-instant', 'gemma2-9b-it']);
 let groqErro = '';
 async function chatGroq(msgs) {
   let ultimo = '';
@@ -357,37 +321,54 @@ app.post('/api/chat', async (req, res) => {
   if (/\b(liga|ligar|ligue|acende|desliga|desligar|apaga)\b/i.test(texto) && /\b(luz|lâmpada|lampada|tv|televis|tomada|ar.?condicionado|ventilador|abajur)\b/i.test(texto) && !casa.listar().length)
     return res.json({ fala: `${NOME_DONO[0].toUpperCase() + NOME_DONO.slice(1)}, ainda não cadastrei seus aparelhos. Abra a tela "Casa" (botão da casinha) e adicione a luz, a TV e o que mais quiser controlar.`, acao: null, cerebro: 'casa' });
 
-  // 1) IAs rápidas primeiro (Groq responde em ~2s); Muse como reserva
-  // (o Muse via fila leva 10-40s — lento demais para ser o primeiro)
-  const cerebrosRapidos = cerebrosDisponiveis();
-  for (const c of cerebrosRapidos) {
-    try {
-      log('🧠 tentando:', c.nome);
-      const r = await pensarComFerramentas(c, [{ role: 'user', content: texto }]);
-      if (r && r.fala) {
-        log('🧠', c.nome + ':', r.fala.slice(0, 80));
-        return res.json({ fala: r.fala, acao: r.acao || null, cerebro: c.nome });
-      }
-    } catch (e) { log('⚠️ ', c.nome, 'falhou:', e.message); }
-  }
-
-  // 2) Muse como reserva, se estiver conectado lendo a fila
+  // 1) Muse, se estiver conectado lendo a fila
   if (museOnline()) {
-    const r = await esperarMuse(enfileirar(texto), Number(process.env.MUSE_ESPERA_MS || 25000));
+    const r = await esperarMuse(enfileirar(texto), Number(process.env.MUSE_ESPERA_MS || 6000));
     if (r && r.response) {
       log('🧠 muse:', r.response);
       return res.json({ fala: r.response, acao: r.control || null, audio_url: r.audio_url || null, cerebro: 'muse' });
     }
-    log('⚠️  Muse não respondeu a tempo');
+    log('⚠️  Muse não respondeu a tempo, usando IA reserva');
   }
 
-  // 3) nenhuma IA respondeu: fallback local
-  const rapida2 = respostaRapida(texto);
-  if (rapida2) return res.json({ ...rapida2, cerebro: 'local' });
-  return res.json({
-    fala: `Desculpe, ${NOME_DONO}, meu cérebro não respondeu. Tente de novo em instantes.`,
-    acao: null, cerebro: 'erro', erro: 'falha'
-  });
+  const rapida = respostaRapida(texto);
+  const cerebros = cerebrosDisponiveis();
+  if (!cerebros.length) {
+    if (rapida) return res.json({ ...rapida, cerebro: 'local' });
+    return res.json({
+      fala: `${NOME_DONO[0].toUpperCase() + NOME_DONO.slice(1)}, meu cérebro está desligado. Configure a chave GROQ_API_KEY para eu poder pensar.`,
+      acao: null, cerebro: 'nenhum', erro: 'sem_chave'
+    });
+  }
+
+  // 2) IAs reserva, em ordem, até uma funcionar
+  const msgs = montarMensagens(texto, history);
+  let ultimoErro = '';
+  for (const c of cerebros) {
+    try {
+      const r = await pensarComFerramentas(c, msgs);
+      let fala = String(r?.fala || r?.resposta || r?.response || '').trim();
+      // ação de casa vinda do cérebro: executa no servidor
+      if (r.acao && r.acao.tipo === 'casa') {
+        const rc = await casa.acionar(r.acao.acao, r.acao.alvo || r.acao.aparelho || 'tudo');
+        const fc = falaCasa(rc, { acao: r.acao.acao, alvo: r.acao.alvo });
+        return res.json({ ...fc, cerebro: c.nome });
+      }
+      if (!fala) throw new Error('resposta vazia');
+      log(`🧠 ${c.nome}:`, fala, r.acao ? JSON.stringify(r.acao) : '');
+      return res.json({ fala, acao: r.acao || null, cerebro: c.nome, ferramentas: r.ferramentas });
+    } catch (e) {
+      ultimoErro = `${c.nome}: ${e.message}`;
+      log('❌', ultimoErro);
+    }
+  }
+  if (rapida) return res.json({ ...rapida, cerebro: 'local' });
+  const det = ultimoErro || groqErro || '';
+  const chaveRuim = /401|invalid|api key|unauthor|no api key/i.test(det);
+  const falaErro = chaveRuim
+    ? `${NOME_DONO[0].toUpperCase() + NOME_DONO.slice(1)}, minha chave de acesso foi recusada. Confira a GROQ_API_KEY.`
+    : `Desculpe, ${NOME_DONO}, meu cérebro não respondeu. Tente de novo em instantes.`;
+  res.json({ fala: falaErro, acao: null, cerebro: 'erro', erro: chaveRuim ? 'chave_invalida' : 'falha', detalhe: det });
 });
 
 // ═══════════════════════════════════════════════════════════════
@@ -526,7 +507,7 @@ app.post('/api/visao', async (req, res) => {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${chave}` },
       body: JSON.stringify({
-        model: process.env.GROQ_VISAO_MODELO || 'qwen/qwen3-32b',
+        model: process.env.GROQ_VISAO_MODELO || 'meta-llama/llama-4-scout-17b-16e-instruct',
         temperature: 0.4, max_tokens: 220,
         messages: [
           { role: 'system', content: `Você é o J.A.R.V.I.S., assistente do ${NOME_DONO}. Fale português do Brasil, chame-o de "${NOME_DONO}". Sua resposta é falada em voz alta: no máximo 2 frases, sem listas nem markdown. Descreva só o que realmente aparece na imagem; não invente. Se a imagem estiver ilegível, diga isso.` },
@@ -685,7 +666,7 @@ app.get('/api/health', (req, res) => {
     onde: NA_NUVEM ? 'nuvem' : 'computador',
     dono: NOME_DONO,
     muse: { conectado: museOnline(), pedidos_na_fila: fila.size },
-    cerebro: cerebros[0] || 'nenhum',
+    cerebro: museOnline() ? 'muse' : (cerebros[0] || 'nenhum'),
     cerebros_reserva: cerebros,
     voz_piper: piperExiste(),
     voz_motor: vozMotor(),
@@ -709,5 +690,3 @@ app.listen(PORTA, () => {
   console.log(`  Cérebro  : ${c.length ? c.join(' → ') : 'NENHUMA CHAVE — configure GROQ_API_KEY no arquivo .env'} (Muse entra quando conectado)`);
   console.log(`  Voz      : ${piperExiste() ? 'Piper Faber PT-BR' : 'voz do navegador (Piper não encontrado)'}\n`);
 });
-
-// deploy-forcado 1792358107
