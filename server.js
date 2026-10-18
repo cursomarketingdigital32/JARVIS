@@ -134,7 +134,7 @@ app.post('/api/muse-brain/respond', (req, res) => {
 const filaVoz = new Map(); // id -> { id, text, ts, audio_url }
 setInterval(() => {
   const agora = Date.now();
-  for (const [k, v] of filaVoz) if (agora - v.ts > 300000) filaVoz.delete(k);
+  for (const [k, v] of filaVoz) if (agora - v.ts > 600000) filaVoz.delete(k);
 }, 60000);
 app.post('/api/tts-voz', (req, res) => {
   const text = String(req.body?.text || '').trim().slice(0, 500);
