@@ -149,6 +149,44 @@ app.post('/api/muse-brain', async (req, res) => {
 });
 
 // ═══════════════════════════════════════════════════════════════
+//  PONTE DE VOZ — a voz clonada do Jarvis no painel
+//  O painel pede POST /api/tts-voz {text} e aguarda em GET /api/tts-voz/:id.
+//  A VM do Jarvis lê GET /api/tts-voz/queue, gera o áudio e devolve via
+//  POST /api/tts-voz/:id {audio_url}.
+//  NÃO REMOVER: sem isto a voz do Jarvis não funciona no painel.
+// ═══════════════════════════════════════════════════════════════
+const filaVoz = new Map();
+setInterval(() => {
+  const agora = Date.now();
+  for (const [k, v] of filaVoz) if (agora - v.ts > 600000) filaVoz.delete(k);
+}, 60000);
+function novoIdVoz() { return Math.random().toString(36).slice(2, 10); }
+app.post('/api/tts-voz', (req, res) => {
+  const text = String(req.body?.text || '').trim().slice(0, 500);
+  if (!text) return res.status(400).json({ error: 'texto vazio' });
+  if ([...filaVoz.values()].filter(j => !j.audio_url).length >= 5)
+    return res.status(429).json({ error: 'fila cheia' });
+  const id = novoIdVoz();
+  filaVoz.set(id, { id, text, ts: Date.now(), audio_url: null });
+  res.json({ id });
+});
+app.get('/api/tts-voz/queue', (req, res) => {
+  res.json([...filaVoz.values()].filter(j => !j.audio_url).map(j => ({ id: j.id, text: j.text })));
+});
+app.post('/api/tts-voz/:id', (req, res) => {
+  const j = filaVoz.get(req.params.id);
+  if (!j) return res.status(404).json({ error: 'job desconhecido' });
+  j.audio_url = String(req.body?.audio_url || '');
+  res.json({ ok: true });
+});
+app.get('/api/tts-voz/:id', (req, res) => {
+  const j = filaVoz.get(req.params.id);
+  if (!j) return res.status(404).json({ ready: false });
+  if (j.audio_url) { filaVoz.delete(req.params.id); return res.json({ ready: true, audio_url: j.audio_url }); }
+  res.json({ ready: false });
+});
+
+// ═══════════════════════════════════════════════════════════════
 //  CÉREBRO 2 — IAs reserva (qualquer uma que tiver chave)
 // ═══════════════════════════════════════════════════════════════
 function lerJSON(txt) {
