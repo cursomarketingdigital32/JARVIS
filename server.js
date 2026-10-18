@@ -181,8 +181,9 @@ async function chatEstiloOpenAI(url, chave, modelo, msgs) {
 }
 
 // Groq com vários modelos: se um estiver fora do ar/descontinuado, tenta o próximo
+// (modelos atualizados em 18/10/2026 — os Llama/Gemma antigos foram desligados pelo Groq)
 const GROQ_MODELOS = (process.env.GROQ_MODELO ? [process.env.GROQ_MODELO] : [])
-  .concat(['llama-3.3-70b-versatile', 'meta-llama/llama-4-maverick-17b-128e-instruct', 'llama-3.1-8b-instant', 'gemma2-9b-it']);
+  .concat(['openai/gpt-oss-120b', 'openai/gpt-oss-20b', 'qwen/qwen3.8-27b']);
 let groqErro = '';
 async function chatGroq(msgs) {
   let ultimo = '';
@@ -490,7 +491,7 @@ app.post('/api/visao', async (req, res) => {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${chave}` },
       body: JSON.stringify({
-        model: process.env.GROQ_VISAO_MODELO || 'meta-llama/llama-4-scout-17b-16e-instruct',
+        model: process.env.GROQ_VISAO_MODELO || 'qwen/qwen3.8-27b',
         temperature: 0.4, max_tokens: 220,
         messages: [
           { role: 'system', content: `Você é o J.A.R.V.I.S., assistente do ${NOME_DONO}. Fale português do Brasil, chame-o de "${NOME_DONO}". Sua resposta é falada em voz alta: no máximo 2 frases, sem listas nem markdown. Descreva só o que realmente aparece na imagem; não invente. Se a imagem estiver ilegível, diga isso.` },
