@@ -1,4 +1,3 @@
-
 services:
   - type: web
     name: jarvis
@@ -13,4 +12,4 @@ services:
       - key: NOME_DONO
         value: senhor
       - key: CIDADE_PADRAO
-        value: São José dos Campos
+        value: Maceió

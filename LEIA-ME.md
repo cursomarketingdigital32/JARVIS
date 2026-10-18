@@ -1,4 +1,3 @@
-
 # J.A.R.V.I.S. 2.0 — conserto completo
 
 ## O que estava quebrado
@@ -111,7 +110,7 @@ Enquanto o Muse estiver lendo a fila, o painel mostra **CÉREBRO: MUSE**. Se ele
 
 ## Deixar o cérebro mais inteligente
 Por padrão ele pensa com o Groq (grátis e rápido). Para ficar mais esperto:
-- **Modelo mais forte no Groq:** adicione a variável `GROQ_MODELO` = `openai/gpt-oss-120b` (ou `openai/gpt-oss-20b`, mais rápido).
+- **Modelo mais forte no Groq:** adicione a variável `GROQ_MODELO` = `meta-llama/llama-4-maverick-17b-128e-instruct`.
 - **Usar o Gemini** (tem plano grátis e é bem inteligente): crie a chave em aistudio.google.com/apikey, adicione `GEMINI_API_KEY` e `CEREBRO_PRINCIPAL=gemini`.
 
 ## Problemas comuns

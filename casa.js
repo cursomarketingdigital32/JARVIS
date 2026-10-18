@@ -1,4 +1,3 @@
-
 // ═══════════════════════════════════════════════════════════════
 //  CASA INTELIGENTE — liga/desliga aparelhos (luz, TV, tomada…)
 //  Funciona de dois jeitos, sem programar:

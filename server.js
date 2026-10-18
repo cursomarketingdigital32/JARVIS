@@ -1,4 +1,3 @@
-
 // ═══════════════════════════════════════════════════════════════
 //  J.A.R.V.I.S. — servidor único (roda no PC e na nuvem / Render)
 //  - Cérebro: Muse (se estiver conectado) → Groq → Gemini → OpenAI
@@ -29,7 +28,7 @@ try {
 
 const NA_NUVEM = !!(process.env.RENDER || process.env.NA_NUVEM);
 const NOME_DONO = process.env.NOME_DONO || 'senhor';
-const CIDADE = process.env.CIDADE_PADRAO || 'São José dos Campos';
+const CIDADE = process.env.CIDADE_PADRAO || 'Maceió';
 
 const app = express();
 app.set('trust proxy', true);
@@ -87,13 +86,8 @@ Sem ação: "acao": null.`;
 //  o Jarvis usa a IA reserva (Groq/Gemini/OpenAI) e não trava mais.
 // ═══════════════════════════════════════════════════════════════
 const fila = new Map();       // id -> pedido
-const respostas = new Map();  // id -> { response, audio_url, control, ts }
+const respostas = new Map();  // id -> resposta
 let ultimaLeituraMuse = 0;
-// limpa respostas atrasadas que ninguém buscou (a cada 5 min, remove as com +10 min)
-setInterval(() => {
-  const agora = Date.now();
-  for (const [k, v] of respostas) if (agora - (v.ts || 0) > 600000) respostas.delete(k);
-}, 300000);
 const museOnline = () => process.env.MUSE_MODO !== 'desligado' && Date.now() - ultimaLeituraMuse < 30000;
 const novoId = () => Math.random().toString(36).slice(2, 10);
 
@@ -124,7 +118,7 @@ app.post('/api/muse-brain/respond', (req, res) => {
   const { id, response, audio_url, control } = req.body || {};
   if (!id) return res.status(400).json({ error: 'id required' });
   ultimaLeituraMuse = Date.now();
-  respostas.set(id, { response, audio_url, control, ts: Date.now() });
+  respostas.set(id, { response, audio_url, control });
   fila.delete(id);
   res.json({ ok: true });
 });
@@ -139,8 +133,7 @@ app.get('/api/muse-brain/result/:id', (req, res) => {
   const r = respostas.get(req.params.id);
   if (!r) return res.json({ ready: false });
   respostas.delete(req.params.id);
-  const { ts, ...limpa } = r;
-  res.json({ ready: true, ...limpa });
+  res.json({ ready: true, ...r });
 });
 app.post('/api/muse-brain', async (req, res) => {
   const { text, language } = req.body || {};
@@ -181,9 +174,8 @@ async function chatEstiloOpenAI(url, chave, modelo, msgs) {
 }
 
 // Groq com vários modelos: se um estiver fora do ar/descontinuado, tenta o próximo
-// (modelos atualizados em 18/10/2026 — os Llama/Gemma antigos foram desligados pelo Groq)
 const GROQ_MODELOS = (process.env.GROQ_MODELO ? [process.env.GROQ_MODELO] : [])
-  .concat(['openai/gpt-oss-120b', 'openai/gpt-oss-20b', 'qwen/qwen3.8-27b']);
+  .concat(['llama-3.3-70b-versatile', 'meta-llama/llama-4-maverick-17b-128e-instruct', 'llama-3.1-8b-instant', 'gemma2-9b-it']);
 let groqErro = '';
 async function chatGroq(msgs) {
   let ultimo = '';
@@ -218,13 +210,31 @@ async function chatGemini(chave, modelo, msgs) {
   return lerJSON(d.candidates?.[0]?.content?.parts?.map(p => p.text).join(''));
 }
 
+// Claude (Anthropic) — cérebro forte, porém PAGO (sem plano grátis)
+async function chatClaude(chave, modelo, msgs) {
+  const sys = msgs[0].content;
+  let hist = msgs.slice(1).map(m => ({ role: m.role === 'assistant' ? 'assistant' : 'user', content: String(m.content) }));
+  while (hist.length && hist[0].role !== 'user') hist.shift(); // Anthropic exige começar com 'user'
+  const r = await fetch('https://api.anthropic.com/v1/messages', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'x-api-key': (chave || '').trim(), 'anthropic-version': '2023-06-01' },
+    body: JSON.stringify({ model: modelo, max_tokens: 500, temperature: 0.7, system: sys, messages: hist }),
+    signal: AbortSignal.timeout(30000)
+  });
+  const d = await r.json().catch(() => ({}));
+  if (!r.ok) throw new Error(d.error?.message || `HTTP ${r.status}`);
+  return lerJSON((d.content || []).map(c => c.text || '').join(''));
+}
+
 function cerebrosDisponiveis() {
   const lista = [];
   if (process.env.GROQ_API_KEY) lista.push({ nome: 'groq', fn: chatGroq });
   if (process.env.GEMINI_API_KEY) lista.push({ nome: 'gemini', fn: m => chatGemini(process.env.GEMINI_API_KEY, process.env.GEMINI_MODELO || 'gemini-2.5-flash', m) });
+  if (process.env.ANTHROPIC_API_KEY) lista.push({ nome: 'claude', fn: m => chatClaude(process.env.ANTHROPIC_API_KEY, process.env.CLAUDE_MODELO || 'claude-3-5-sonnet-latest', m) });
   if (process.env.OPENAI_API_KEY) lista.push({ nome: 'openai', fn: m => chatEstiloOpenAI(process.env.OPENAI_URL || 'https://api.openai.com/v1/chat/completions', process.env.OPENAI_API_KEY, process.env.OPENAI_MODELO || 'gpt-4o-mini', m) });
   // escolha do cérebro principal (CEREBRO_PRINCIPAL=gemini deixa o Gemini na frente)
-  const pref = (process.env.CEREBRO_PRINCIPAL || '').toLowerCase();
+  // padrão: Gemini na frente quando a chave dele existir (mais inteligente); senão fica o Groq
+  const pref = (process.env.CEREBRO_PRINCIPAL || 'gemini').toLowerCase();
   if (pref) lista.sort((a, b) => (b.nome === pref) - (a.nome === pref));
   return lista;
 }
@@ -491,7 +501,7 @@ app.post('/api/visao', async (req, res) => {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${chave}` },
       body: JSON.stringify({
-        model: process.env.GROQ_VISAO_MODELO || 'qwen/qwen3.8-27b',
+        model: process.env.GROQ_VISAO_MODELO || 'meta-llama/llama-4-scout-17b-16e-instruct',
         temperature: 0.4, max_tokens: 220,
         messages: [
           { role: 'system', content: `Você é o J.A.R.V.I.S., assistente do ${NOME_DONO}. Fale português do Brasil, chame-o de "${NOME_DONO}". Sua resposta é falada em voz alta: no máximo 2 frases, sem listas nem markdown. Descreva só o que realmente aparece na imagem; não invente. Se a imagem estiver ilegível, diga isso.` },

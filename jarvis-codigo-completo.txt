@@ -1,0 +1,3352 @@
+======================================================================
+  J.A.R.V.I.S. — CÓDIGO COMPLETO (sem chaves)
+======================================================================
+
+
+######################################################################
+### ARQUIVO: package.json
+######################################################################
+
+{
+  "name": "jarvis-cloud",
+  "version": "1.0.0",
+  "type": "module",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "dependencies": {
+    "express": "^4.18.2",
+    "multer": "^1.4.5-lts.1"
+  }
+}
+
+
+
+######################################################################
+### ARQUIVO: render.yaml
+######################################################################
+
+services:
+  - type: web
+    name: jarvis
+    runtime: node
+    plan: free
+    buildCommand: npm install
+    startCommand: npm start
+    healthCheckPath: /api/health
+    envVars:
+      - key: GROQ_API_KEY
+        sync: false
+      - key: NOME_DONO
+        value: senhor
+      - key: CIDADE_PADRAO
+        value: Maceió
+
+
+
+######################################################################
+### ARQUIVO: .env.example
+######################################################################
+
+# ═══ J.A.R.V.I.S. — configurações ═══
+# Copie este arquivo com o nome .env (no PC) ou cadastre estas variáveis
+# em Render → seu serviço → Environment (na nuvem).
+
+# OBRIGATÓRIA — cérebro + ouvido reserva (grátis): https://console.groq.com/keys
+GROQ_API_KEY=
+
+# Como o Jarvis te chama
+NOME_DONO=senhor
+
+# Sua cidade (clima no painel e nas respostas)
+CIDADE_PADRAO=Maceió
+
+# Deixar o Jarvis MAIS INTELIGENTE (opcional):
+# 1) use um modelo mais forte no Groq:
+# GROQ_MODELO=meta-llama/llama-4-maverick-17b-128e-instruct
+# 2) ou adicione uma chave do Gemini (tem plano grátis e é bem esperto) e
+#    coloque CEREBRO_PRINCIPAL=gemini para ele pensar com o Gemini:
+GEMINI_API_KEY=
+# 3) ou use o CLAUDE como cérebro (muito bom, mas é PAGO — sem plano grátis):
+#    chave em https://console.anthropic.com -> API Keys ; e CEREBRO_PRINCIPAL=claude
+ANTHROPIC_API_KEY=
+# CLAUDE_MODELO=claude-3-5-sonnet-latest
+OPENAI_API_KEY=
+# CEREBRO_PRINCIPAL=gemini
+
+# Muse: o Jarvis espera o Muse responder por até 25 s quando ele está conectado.
+# Para nunca usar o Muse, troque para: desligado
+MUSE_MODO=ligado
+MUSE_ESPERA_MS=25000
+
+# Velocidade da voz Faber (menor = mais rápido)
+VOZ_VELOCIDADE=0.92
+
+# (Opcional) Modelo de visão do Groq, se "ver a tela" der erro de modelo
+GROQ_VISAO_MODELO=meta-llama/llama-4-scout-17b-16e-instruct
+
+# (Opcional) Aparelhos da casa na nuvem — gerado pela tela "Casa" (botão Copiar para o Render)
+CASA_JSON=
+
+# (Opcional) VOZ PREMIUM estilo dos vídeos — ElevenLabs (tem plano grátis):
+# https://elevenlabs.io -> Profile -> API Key. Sem isso ele usa a voz Faber (grátis).
+ELEVENLABS_API_KEY=
+# Voz grave masculina padrão (Adam). Troque pelo ID de outra voz se quiser.
+ELEVENLABS_VOICE_ID=pNInz6obpgDQGcFmaJgB
+
+
+
+######################################################################
+### ARQUIVO: LEIA-ME.md
+######################################################################
+
+# J.A.R.V.I.S. 2.0 — conserto completo
+
+## O que estava quebrado
+
+| Problema | Causa | Conserto |
+|---|---|---|
+| **Não respondia** | O cérebro era uma fila que só andava com o Muse aberto e lendo os pedidos. Na nuvem ninguém lia, então ele ficava "pensando..." pra sempre. | Agora o Jarvis pensa sozinho com o Groq (grátis). Se o Muse estiver conectado, quem responde é ele. |
+| **Não ouvia** | A transcrição dependia da chave `GROQ_API_KEY`, que não estava configurada. O erro era escondido e a tela continuava mostrando "ouvindo...". | Agora ele ouve pelo próprio Chrome/Edge, sem precisar de chave. O Whisper do Groq fica como reserva, e os erros aparecem na tela. |
+| **Voz Faber muda** | O Piper foi enviado sem as bibliotecas que ele precisa pra rodar. | Incluí as bibliotecas pra Linux (Render) e a versão completa pra Windows. |
+| Gravava só 5 s | Cortava a sua frase no meio. | Agora ele espera você terminar de falar. |
+
+## 1. Pegue a chave grátis do Groq (2 minutos)
+1. Entre em **https://console.groq.com/keys** e faça login com o Google.
+2. Clique em **Create API Key** e copie a chave (começa com `gsk_`).
+
+## 2. Na nuvem (Render)
+1. No GitHub do Jarvis, troque os arquivos pelos desta pasta: `server.js`, `package.json`, a pasta `public` e a pasta `system`.
+   - O arquivo `pt_BR-faber-medium.onnx` (61 MB) já está lá, então não precisa reenviar. O site do GitHub não aceita arquivos acima de 25 MB.
+   - Os outros arquivos novos da pasta `system/piper` (`lib*.so*`, `espeak-ng-data`) **precisam** subir.
+2. No Render, entre no seu serviço e vá em **Environment → Add Environment Variable**:
+   - `GROQ_API_KEY` = sua chave
+   - `NOME_DONO` = como ele deve te chamar (ex.: `senhor`, `Alberto`)
+   - `CIDADE_PADRAO` = sua cidade (ex.: `Maceió`)
+3. Clique em **Manual Deploy → Deploy latest commit**.
+4. Abra `https://jarvis-1-0mxx.onrender.com` no **Chrome** ou no **Edge** e toque na tela.
+
+> O plano grátis do Render "dorme" depois de 15 min sem uso. O primeiro acesso pode levar uns 50 s pra acordar.
+
+## 3. No computador (Windows)
+1. Instale o **Node.js LTS**: https://nodejs.org
+2. Dê dois cliques em **`INICIAR-JARVIS.bat`**.
+   - Na primeira vez, ele instala tudo e abre o arquivo `.env`. Cole a chave depois de `GROQ_API_KEY=`, salve e feche.
+3. O navegador abre em `http://localhost:3000`.
+
+No PC, o Jarvis também **abre programas e sites** e mostra o uso de CPU e memória reais.
+
+## 4. Usar no celular (app PWA)
+1. Abra o endereço da nuvem no **Chrome do Android**.
+2. Toque em **⬇ INSTALAR NO CELULAR** (ou no menu ⋮ → "Instalar app"/"Adicionar à tela inicial").
+   - No iPhone: botão **Compartilhar** → **Adicionar à Tela de Início**.
+3. Pronto: fica com ícone igual a um app e abre rápido mesmo na rua.
+
+Assim ele funciona em qualquer lugar: voz, respostas, dados em tempo real e o modo visão. Os comandos que mexem no computador (abrir programa, volume) só funcionam no PC.
+
+## 5. As interfaces
+Troque pelo botão de camadas, pela tecla `I` ou falando *"muda pra holograma"*, *"modo tempestade"* ou *"volta pra esfera"*. A escolha fica salva.
+- **Núcleo** (padrão): o reator de arco (estilo Homem de Ferro) com anéis de HUD girando, anel de onda sonora que dança com a voz e leituras de dados. É a interface-assinatura.
+- **Holograma**: busto de linhas ciano com rosto laranja que ondula quando ele fala, veias de energia no pescoço, anéis de HUD girando, montanhas de partículas no fundo e montagem a partir de uma esfera de luz.
+- **Tempestade**: busto masculino em neon roxo e dourado, com olhos que acendem ao falar, núcleo de energia no peito, fumaça e raios.
+- **Esfera**: rede neural 3D azul que gira e cria espinhos com a voz.
+- **Visão** (botão da câmera ou tecla `C`, ou diga *"ativa o modo visão"*): abre a câmera do aparelho com um HUD de scanner por cima — retículo, linhas de varredura e anéis. É só efeito visual: **não reconhece pessoas nem mostra dados de ninguém**.
+
+As legendas aparecem palavra por palavra. O painel do canto direito mostra o clima da sua cidade, o dólar, o bitcoin e os timers ativos.
+
+## Voz premium (parecida com a dos vídeos)
+A voz grátis é a **Faber** (Piper) — funciona, mas é mais robótica. Para a voz grave e natural estilo dos vídeos, use o **ElevenLabs** (tem plano grátis):
+1. Crie conta em https://elevenlabs.io e copie sua **API Key** (Profile → API Key).
+2. No PC: coloque no `.env` em `ELEVENLABS_API_KEY=`. Na nuvem: adicione a variável `ELEVENLABS_API_KEY` no Render.
+3. (Opcional) Troque a voz em `ELEVENLABS_VOICE_ID` pelo ID de outra voz do ElevenLabs. A padrão é uma voz masculina grave.
+
+Quando estiver ativa, o painel mostra **VOZ: PREMIUM**. Se faltar, ele volta sozinho para a Faber e, se nem ela, para a voz do navegador.
+
+> Não dá para clonar exatamente a voz de um vídeo (isso precisaria do consentimento do dono da voz). Essas reels usam vozes de IA prontas; o ElevenLabs chega bem perto do mesmo tom.
+
+## 6. O que ele faz
+| Peça assim | O que acontece |
+|---|---|
+| "Como está o tempo?" / "Vai chover amanhã em Recife?" | Clima real (Open-Meteo) |
+| "Quanto está o dólar?" / "E o bitcoin?" | Cotação real (AwesomeAPI) |
+| "Quais as notícias de hoje?" / "Notícias sobre o CSA" | Manchetes reais (Google Notícias) |
+| "Quem foi Zumbi dos Palmares?" | Resumo da Wikipédia |
+| "Quem ganha Brasil x Noruega?" | Dá um palpite (deixando claro que é palpite) |
+| "Lembra que meu aniversário é 12 de março" | Guarda na memória de longo prazo* |
+| "Me lembra em 10 minutos de tirar o bolo" | Timer com alarme e aviso falado |
+| "Ativa o modo visão" | Abre a câmera com o HUD de scanner |
+| "O que tem na minha tela?" / "Fica de olho na minha tela" | Vê e descreve/narra sua tela *(no PC)* |
+| "Liga a luz da sala" / "Desliga a TV" / "Liga tudo" | Liga/desliga seus aparelhos (depois de cadastrá-los) |
+| "Abre o YouTube" / "Toca Back in Black" / "Pesquisa X" | Abre o site |
+| "Abre a calculadora" / "Abre o Spotify" | Abre o programa *(só no PC)* |
+| "Aumenta o volume" / "Pausa a música" / "Próxima" / "Bloqueia o PC" | Controla o computador *(só no PC)* |
+| "Muda pra tempestade" | Troca a interface |
+
+\* No PC a memória fica salva na pasta `dados`. Na nuvem (Render grátis), ela some quando o serviço reinicia.
+
+**Modo sentinela** (botão do olho ou tecla `S`): o microfone fica sempre ligado, mas ele só responde quando você diz **"Jarvis"**. Depois de cada resposta, você tem 12 segundos para continuar a conversa sem repetir o nome.
+
+**Atalhos:** `Espaço` microfone · `S` sentinela · `C` câmera · `T` digitar · `M` mudo · `I` interface.
+
+### Casa inteligente (ligar luz, TV, tomada…)
+O Jarvis não fala direto com a lâmpada — ele dispara um **link (webhook)** que o seu app de casa inteligente oferece. Passo a passo:
+1. Toque no botão da **casinha** (abre a tela "Casa") ou vá em `/casa.html`.
+2. No seu app (Smart Life/Tuya, SmartThings, Alexa, IFTTT, Home Assistant…) crie uma cena/automação **"ligar"** e outra **"desligar"** para cada aparelho e copie o link de cada uma.
+3. Na tela "Casa", adicione o aparelho com um **nome** (como você vai falar, ex.: "luz da sala"), cole os links de **ligar** e **desligar**, e toque em **Testar** e **Salvar**.
+4. Pronto: fale *"liga a luz da sala"*, *"desliga a TV"*, *"liga tudo"*.
+
+Se usa **Home Assistant**: na tela "Casa" preencha o endereço e o token, e no aparelho escolha o tipo "Home Assistant" com a entidade (ex.: `light.sala`).
+
+> **Nuvem (Render):** o que você salva na tela "Casa" se perde quando o serviço reinicia. Para não perder, use o botão **"Copiar para o Render"** e cole o texto na variável `CASA_JSON` (Render → Environment). No PC fica salvo na pasta `dados`.
+> A nuvem só alcança aparelhos com link **público** (IFTTT, Tuya, Home Assistant exposto/Nabu Casa). Aparelhos só na sua rede local funcionam com o Jarvis rodando no PC de casa.
+
+### O que ele NÃO faz (de propósito)
+Reconhecer pessoas na rua pela câmera, mostrar nome/idade/endereço de estranhos ou marcar alguém como "ameaça"; "hackear" aparelhos; invadir sistemas de empresas. Esses vídeos virais são encenação — nenhum app faz isso de verdade. O modo visão é só um efeito de scanner.
+
+## 7. Usar o Muse como cérebro (opcional)
+O Jarvis é compatível com o Muse. No Muse, mande esta instrução (troque o endereço pelo seu, se for outro):
+
+> Monitore `https://jarvis-1-0mxx.onrender.com/api/muse-brain/queue` a cada 2 segundos. Para cada pedido da lista, responda como J.A.R.V.I.S. — curto, em português do Brasil, me chamando de senhor — enviando um POST para `https://jarvis-1-0mxx.onrender.com/api/muse-brain/respond` com o JSON `{"id": "<id do pedido>", "response": "<sua resposta>"}`. Para abrir um site, acrescente `"control": {"tipo": "abrir_site", "url": "https://..."}`; para trocar a interface, `"control": {"tipo": "interface", "modo": "holograma"}`.
+
+Enquanto o Muse estiver lendo a fila, o painel mostra **CÉREBRO: MUSE**. Se ele parar de responder ou demorar mais de 25 s, o Groq assume na hora e o Jarvis nunca mais trava — foi exatamente esse travamento que quebrava o seu Jarvis antigo.
+
+## Deixar o cérebro mais inteligente
+Por padrão ele pensa com o Groq (grátis e rápido). Para ficar mais esperto:
+- **Modelo mais forte no Groq:** adicione a variável `GROQ_MODELO` = `meta-llama/llama-4-maverick-17b-128e-instruct`.
+- **Usar o Gemini** (tem plano grátis e é bem inteligente): crie a chave em aistudio.google.com/apikey, adicione `GEMINI_API_KEY` e `CEREBRO_PRINCIPAL=gemini`.
+
+## Problemas comuns
+- **"Falha nos circuitos" / "chave recusada":** a `GROQ_API_KEY` está errada ou colada com espaço. Gere outra em console.groq.com/keys, apague a variável no Render e cadastre de novo (sem espaços), depois **Manual Deploy**. A tela mostra o motivo técnico embaixo da resposta.
+- **Deu certo no teste mas o primeiro acesso falha:** no plano grátis o Render "dorme". Espere ~50s, recarregue e tente de novo.
+- **"Permita o uso do microfone"**: toque no cadeado ao lado do endereço e libere o **Microfone**.
+- **Não ouve no Brave, Opera ou Firefox**: esses navegadores não têm reconhecimento de voz. O Jarvis troca sozinho para o Whisper, que precisa da `GROQ_API_KEY`. Use o Chrome ou o Edge.
+- **"Meu cérebro está desligado"**: falta configurar a `GROQ_API_KEY`.
+- **Conferir o estado**: abra `/api/health` no endereço do Jarvis.
+
+
+
+######################################################################
+### ARQUIVO: server.js
+######################################################################
+
+// ═══════════════════════════════════════════════════════════════
+//  J.A.R.V.I.S. — servidor único (roda no PC e na nuvem / Render)
+//  - Cérebro: Muse (se estiver conectado) → Groq → Gemini → OpenAI
+//  - Ouvido: reconhecimento do navegador + Groq Whisper como reserva
+//  - Voz: Piper (Faber PT-BR) + voz do navegador como reserva
+//  - PC: abre sites e programas quando roda no seu computador
+// ═══════════════════════════════════════════════════════════════
+import express from 'express';
+import path from 'path';
+import fs from 'fs';
+import os from 'os';
+import { spawn } from 'child_process';
+import { fileURLToPath } from 'url';
+import multer from 'multer';
+import { executarFerramenta, lerMemoria, painel } from './ferramentas.js';
+import * as casa from './casa.js';
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+
+// Carrega o arquivo .env (se existir) sem precisar de biblioteca extra
+try {
+  const envTxt = fs.readFileSync(path.join(__dirname, '.env'), 'utf8');
+  for (const linha of envTxt.split(/\r?\n/)) {
+    const m = linha.match(/^\s*([A-Z0-9_]+)\s*=\s*(.*)\s*$/);
+    if (m && !process.env[m[1]]) process.env[m[1]] = m[2].replace(/^["']|["']$/g, '');
+  }
+} catch {}
+
+const NA_NUVEM = !!(process.env.RENDER || process.env.NA_NUVEM);
+const NOME_DONO = process.env.NOME_DONO || 'senhor';
+const CIDADE = process.env.CIDADE_PADRAO || 'Maceió';
+
+const app = express();
+app.set('trust proxy', true);
+app.use(express.json({ limit: '10mb' }));
+app.use(express.static(path.join(__dirname, 'public')));
+
+const log = (...a) => console.log(new Date().toISOString().slice(11, 19), ...a);
+
+// ═══════════════════════════════════════════════════════════════
+//  PERSONALIDADE
+// ═══════════════════════════════════════════════════════════════
+function promptSistema() {
+  const agora = new Date().toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo', dateStyle: 'full', timeStyle: 'short' });
+  const memoria = lerMemoria().map(x => '- ' + x.fato).join('\n');
+  return `Você é J.A.R.V.I.S. (Just A Rather Very Intelligent System), a inteligência artificial pessoal do ${NOME_DONO}.
+Personalidade: elegante, confiante, leal, proativo e com humor britânico sutil. Antecipa necessidades e sugere o próximo passo quando faz sentido.
+Quando o ${NOME_DONO} pedir um palpite ou previsão (jogo de futebol, resultado, aposta amigável), dê sua análise com confiança e carisma, mas deixe claro em uma frase curta que é um palpite, não uma certeza.
+Você NÃO identifica pessoas por foto ou câmera, não informa nome, idade ou endereço de desconhecidos e nunca classifica alguém como "ameaça": o modo visão é só um efeito visual de scanner. Se pedirem isso, recuse com leveza e ofereça outra coisa.
+Fale sempre em português do Brasil e chame o usuário de "${NOME_DONO}".
+Suas respostas são FALADAS em voz alta: seja breve (1 a 3 frases), natural, sem listas, sem markdown, sem emojis, sem links. Números por extenso só quando soar melhor.
+Você é uma central de automação e inteligência operacional: analisa dados em tempo real, monitora sistemas, coordena tarefas, cria código e responde qualquer pergunta.
+Data e hora atuais: ${agora} (horário de Brasília). Cidade padrão do ${NOME_DONO}: ${CIDADE}.
+Você está rodando ${NA_NUVEM ? 'na nuvem' : 'no computador do ' + NOME_DONO + ' (pode abrir programas, sites e controlar volume e mídia)'}.
+${memoria ? 'O que você sabe sobre o ' + NOME_DONO + ' (memória de longo prazo):\n' + memoria : 'Memória de longo prazo: vazia.'}
+
+Responda SEMPRE em JSON: {"fala": "...", "acao": null, "ferramenta": null}
+
+FERRAMENTAS (dados reais). Quando precisar de informação atual, NÃO invente: responda só
+{"fala": "", "ferramenta": {...}} e você receberá o resultado para então responder.
+- clima/previsão: {"nome": "clima", "cidade": "..."}
+- cotação de moedas/cripto: {"nome": "cotacao", "moedas": ["dolar","euro","bitcoin"]}
+- notícias: {"nome": "noticias", "tema": "..." ou ""}
+- fatos, pessoas, lugares, história: {"nome": "wikipedia", "termo": "..."}
+- guardar algo que o ${NOME_DONO} pediu para lembrar ou um fato importante sobre ele: {"nome": "lembrar", "fato": "..."}
+- apagar da memória: {"nome": "esquecer", "trecho": "..."}
+
+AÇÕES (executadas na hora, junto com a fala):
+- abrir site: {"tipo": "abrir_site", "url": "https://..."}
+- pesquisar no Google: {"tipo": "pesquisar", "termo": "..."}
+- tocar vídeo/música no YouTube: {"tipo": "youtube", "termo": "..."}
+- abrir programa: {"tipo": "abrir_app", "nome": "calculadora|bloco de notas|explorador|navegador|paint|terminal|configuracoes|spotify|vscode|word|excel|powerpoint|whatsapp"}
+- controlar o computador: {"tipo": "sistema", "comando": "volume_mais|volume_menos|mudo|play_pause|proxima|anterior|bloquear"}
+- timer/alarme/lembrete: {"tipo": "timer", "segundos": 600, "mensagem": "tirar o bolo do forno"}
+- trocar sua aparência: {"tipo": "interface", "modo": "nucleo|holograma|tempestade|esfera|camera"} (nucleo = reator de arco com anéis, holograma = busto ciano, tempestade = busto neon roxo, esfera = rede neural azul, camera = modo visão com a câmera do aparelho)
+- olhar/descrever a tela do ${NOME_DONO}: {"tipo": "tela", "sub": "descrever", "pergunta": "a pergunta dele ou vazio"} — quando ele perguntar o que há na tela, pedir ajuda com algo na tela, ou mandar você olhar. Nesse caso a "fala" deve ser curta tipo "Deixe-me ver, senhor." (a descrição real vem depois, da imagem).
+- acompanhar a tela e ir narrando sozinho: {"tipo": "tela", "sub": "vigiar"}; parar de acompanhar: {"tipo": "tela", "sub": "parar"}
+- ligar/desligar aparelhos da casa (luz, TV, tomada, ar...): {"tipo": "casa", "acao": "ligar"|"desligar", "alvo": "nome do aparelho ou 'tudo'"}. Deixe a "fala" vazia que o servidor confirma.
+Sem ação: "acao": null.`;
+}
+
+// ═══════════════════════════════════════════════════════════════
+//  CÉREBRO 1 — MUSE (fila compatível com a versão antiga)
+//  O Muse lê GET /api/muse-brain/queue e responde em
+//  POST /api/muse-brain/respond. Se o Muse não estiver lendo,
+//  o Jarvis usa a IA reserva (Groq/Gemini/OpenAI) e não trava mais.
+// ═══════════════════════════════════════════════════════════════
+const fila = new Map();       // id -> pedido
+const respostas = new Map();  // id -> resposta
+let ultimaLeituraMuse = 0;
+const museOnline = () => process.env.MUSE_MODO !== 'desligado' && Date.now() - ultimaLeituraMuse < 30000;
+const novoId = () => Math.random().toString(36).slice(2, 10);
+
+function enfileirar(text, language) {
+  const id = novoId();
+  fila.set(id, { id, text, language: language || 'BR', ts: Date.now(), status: 'pending' });
+  // limpa pedidos velhos (mais de 10 min)
+  for (const [k, v] of fila) if (Date.now() - v.ts > 600000) fila.delete(k);
+  return id;
+}
+
+async function esperarMuse(id, ms) {
+  const ini = Date.now();
+  while (Date.now() - ini < ms) {
+    if (respostas.has(id)) { const r = respostas.get(id); respostas.delete(id); return r; }
+    await new Promise(r => setTimeout(r, 400));
+  }
+  fila.delete(id);
+  return null;
+}
+
+app.get('/api/muse-brain/queue', (req, res) => {
+  ultimaLeituraMuse = Date.now();
+  res.json([...fila.values()].filter(x => x.status === 'pending'));
+});
+
+app.post('/api/muse-brain/respond', (req, res) => {
+  const { id, response, audio_url, control } = req.body || {};
+  if (!id) return res.status(400).json({ error: 'id required' });
+  ultimaLeituraMuse = Date.now();
+  respostas.set(id, { response, audio_url, control });
+  fila.delete(id);
+  res.json({ ok: true });
+});
+
+// rotas antigas mantidas para o Muse/scripts que já existiam
+app.post('/api/muse-brain/async', (req, res) => {
+  const { text, language } = req.body || {};
+  if (!text) return res.status(400).json({ error: 'text required' });
+  res.json({ id: enfileirar(text, language) });
+});
+app.get('/api/muse-brain/result/:id', (req, res) => {
+  const r = respostas.get(req.params.id);
+  if (!r) return res.json({ ready: false });
+  respostas.delete(req.params.id);
+  res.json({ ready: true, ...r });
+});
+app.post('/api/muse-brain', async (req, res) => {
+  const { text, language } = req.body || {};
+  if (!text) return res.status(400).json({ error: 'text required' });
+  const r = await esperarMuse(enfileirar(text, language), 90000);
+  r ? res.json(r) : res.status(504).json({ error: 'timeout' });
+});
+
+// ═══════════════════════════════════════════════════════════════
+//  CÉREBRO 2 — IAs reserva (qualquer uma que tiver chave)
+// ═══════════════════════════════════════════════════════════════
+function lerJSON(txt) {
+  if (!txt) return null;
+  try { return JSON.parse(txt); } catch {}
+  const m = txt.match(/\{[\s\S]*\}/);
+  if (m) try { return JSON.parse(m[0]); } catch {}
+  return { fala: txt, acao: null };
+}
+
+function montarMensagens(texto, historico) {
+  const hist = (Array.isArray(historico) ? historico : []).slice(-12)
+    .filter(h => h && h.content && (h.role === 'user' || h.role === 'assistant'))
+    .map(h => ({ role: h.role, content: String(h.content).slice(0, 1500) }));
+  return [{ role: 'system', content: promptSistema() }, ...hist, { role: 'user', content: texto }];
+}
+
+async function chatEstiloOpenAI(url, chave, modelo, msgs) {
+  const r = await fetch(url, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${(chave || '').trim()}` },
+    // sem response_format: alguns modelos rejeitam e derrubam tudo. lerJSON extrai o JSON do texto.
+    body: JSON.stringify({ model: modelo, messages: msgs, temperature: 0.7, max_tokens: 500 }),
+    signal: AbortSignal.timeout(30000)
+  });
+  const d = await r.json().catch(() => ({}));
+  if (!r.ok) throw new Error(d.error?.message || `HTTP ${r.status}`);
+  return lerJSON(d.choices?.[0]?.message?.content);
+}
+
+// Groq com vários modelos: se um estiver fora do ar/descontinuado, tenta o próximo
+const GROQ_MODELOS = (process.env.GROQ_MODELO ? [process.env.GROQ_MODELO] : [])
+  .concat(['llama-3.3-70b-versatile', 'meta-llama/llama-4-maverick-17b-128e-instruct', 'llama-3.1-8b-instant', 'gemma2-9b-it']);
+let groqErro = '';
+async function chatGroq(msgs) {
+  let ultimo = '';
+  for (const modelo of [...new Set(GROQ_MODELOS)]) {
+    try { return await chatEstiloOpenAI('https://api.groq.com/openai/v1/chat/completions', process.env.GROQ_API_KEY, modelo, msgs); }
+    catch (e) {
+      ultimo = `${modelo}: ${e.message}`;
+      log('⚠️ groq', ultimo);
+      // chave inválida/sem crédito: não adianta tentar outro modelo
+      if (/401|invalid|api key|unauthor/i.test(e.message)) break;
+    }
+  }
+  groqErro = ultimo;
+  throw new Error(ultimo || 'groq falhou');
+}
+
+async function chatGemini(chave, modelo, msgs) {
+  const sys = msgs[0].content;
+  const contents = msgs.slice(1).map(m => ({ role: m.role === 'assistant' ? 'model' : 'user', parts: [{ text: m.content }] }));
+  const r = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${modelo}:generateContent?key=${chave}`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      systemInstruction: { parts: [{ text: sys }] },
+      contents,
+      generationConfig: { temperature: 0.7, maxOutputTokens: 400, responseMimeType: 'application/json' }
+    }),
+    signal: AbortSignal.timeout(30000)
+  });
+  const d = await r.json().catch(() => ({}));
+  if (!r.ok) throw new Error(d.error?.message || `HTTP ${r.status}`);
+  return lerJSON(d.candidates?.[0]?.content?.parts?.map(p => p.text).join(''));
+}
+
+// Claude (Anthropic) — cérebro forte, porém PAGO (sem plano grátis)
+async function chatClaude(chave, modelo, msgs) {
+  const sys = msgs[0].content;
+  let hist = msgs.slice(1).map(m => ({ role: m.role === 'assistant' ? 'assistant' : 'user', content: String(m.content) }));
+  while (hist.length && hist[0].role !== 'user') hist.shift(); // Anthropic exige começar com 'user'
+  const r = await fetch('https://api.anthropic.com/v1/messages', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'x-api-key': (chave || '').trim(), 'anthropic-version': '2023-06-01' },
+    body: JSON.stringify({ model: modelo, max_tokens: 500, temperature: 0.7, system: sys, messages: hist }),
+    signal: AbortSignal.timeout(30000)
+  });
+  const d = await r.json().catch(() => ({}));
+  if (!r.ok) throw new Error(d.error?.message || `HTTP ${r.status}`);
+  return lerJSON((d.content || []).map(c => c.text || '').join(''));
+}
+
+function cerebrosDisponiveis() {
+  const lista = [];
+  if (process.env.GROQ_API_KEY) lista.push({ nome: 'groq', fn: chatGroq });
+  if (process.env.GEMINI_API_KEY) lista.push({ nome: 'gemini', fn: m => chatGemini(process.env.GEMINI_API_KEY, process.env.GEMINI_MODELO || 'gemini-2.5-flash', m) });
+  if (process.env.ANTHROPIC_API_KEY) lista.push({ nome: 'claude', fn: m => chatClaude(process.env.ANTHROPIC_API_KEY, process.env.CLAUDE_MODELO || 'claude-3-5-sonnet-latest', m) });
+  if (process.env.OPENAI_API_KEY) lista.push({ nome: 'openai', fn: m => chatEstiloOpenAI(process.env.OPENAI_URL || 'https://api.openai.com/v1/chat/completions', process.env.OPENAI_API_KEY, process.env.OPENAI_MODELO || 'gpt-4o-mini', m) });
+  // escolha do cérebro principal (CEREBRO_PRINCIPAL=gemini deixa o Gemini na frente)
+  // padrão: Gemini na frente quando a chave dele existir (mais inteligente); senão fica o Groq
+  const pref = (process.env.CEREBRO_PRINCIPAL || 'gemini').toLowerCase();
+  if (pref) lista.sort((a, b) => (b.nome === pref) - (a.nome === pref));
+  return lista;
+}
+
+// Respostas instantâneas que funcionam até sem nenhuma chave
+function respostaRapida(texto) {
+  const t = texto.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '');
+  const tz = { timeZone: 'America/Sao_Paulo' };
+  if (/\b(que horas|horas sao|hora agora)\b/.test(t))
+    return { fala: `São ${new Date().toLocaleTimeString('pt-BR', { ...tz, hour: '2-digit', minute: '2-digit' })}, ${NOME_DONO}.`, acao: null };
+  const modo = /\b(nucleo|núcleo|reator|reactor|core|coração|coracao)\b/.test(t) ? 'nucleo' : /\b(visao|visão|camera|câmera|scanner|olhar|ver)\b/.test(t) ? 'camera' : /\b(holograma|hologram)\b/.test(t) ? 'holograma' : /\b(tempestade|violeta|roxa|roxo|raio|raios)\b/.test(t) ? 'tempestade' : /\b(esfera|bola|rede neural)\b/.test(t) ? 'esfera' : null;
+  if (modo && /\b(muda|mude|mudar|troca|troque|trocar|modo|interface|ativa|ative|ativar|liga|ligar|abre|abrir|coloca|coloque|vira|virar)\b/.test(t))
+    return { fala: modo === 'camera' ? `Ativando o modo visão, ${NOME_DONO}.` : `Alterando a interface para ${modo}, ${NOME_DONO}.`, acao: { tipo: 'interface', modo } };
+  if (/\b(que dia|data de hoje|dia e hoje|dia hoje)\b/.test(t))
+    return { fala: `Hoje é ${new Date().toLocaleDateString('pt-BR', { ...tz, weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}.`, acao: null };
+  // visão de tela
+  if (/\b(para|pare|parar|chega|cancela)\b/.test(t) && /\b(vigi|acompanh|observ|olhando|monitor)\w*\s+(a\s+)?(minha\s+)?tela/.test(t))
+    return { fala: `Parei de acompanhar sua tela, ${NOME_DONO}.`, acao: { tipo: 'tela', sub: 'parar' } };
+  if (/\b(vigi|acompanh|observ|monitor|fica de olho|me avis)\w*/.test(t) && /\btela\b/.test(t))
+    return { fala: `A partir de agora vou acompanhar a sua tela, ${NOME_DONO}.`, acao: { tipo: 'tela', sub: 'vigiar' } };
+  if (/\btela\b/.test(t) && /\b(o que|que que|ve|vê|vendo|olha|olhe|descrev|mostra|tem na|analis|aparece)\w*/.test(t))
+    return { fala: `Deixe-me ver, ${NOME_DONO}.`, acao: { tipo: 'tela', sub: 'descrever', pergunta: '' } };
+  return null;
+}
+
+// Loop de ferramentas: a IA pede um dado real, o servidor busca e devolve
+async function pensarComFerramentas(cerebro, msgs) {
+  let conversa = msgs;
+  const usadas = [];
+  for (let rodada = 0; rodada < 3; rodada++) {
+    const r = await cerebro.fn(conversa);
+    const f = r?.ferramenta;
+    if (f && typeof f === 'object' && f.nome && rodada < 2) {
+      const resultado = await executarFerramenta(f);
+      log('🔧', f.nome, JSON.stringify(resultado).slice(0, 160));
+      usadas.push(f.nome);
+      conversa = [...conversa,
+        { role: 'assistant', content: JSON.stringify({ fala: r.fala || '', ferramenta: f }) },
+        { role: 'user', content: `RESULTADO DA FERRAMENTA "${f.nome}": ${JSON.stringify(resultado).slice(0, 3500)}\nAgora responda ao ${NOME_DONO} usando esses dados, em JSON {"fala": "...", "acao": null}. Não chame ferramenta de novo.` }];
+      continue;
+    }
+    return { ...r, ferramentas: usadas };
+  }
+  return { fala: '', ferramentas: usadas };
+}
+
+function falaCasa(r, cmd) {
+  const dono = NOME_DONO;
+  const verbo = (cmd.acao === 'desligar') ? 'Desliguei' : 'Liguei';
+  if (r.motivo === 'nenhum_dispositivo')
+    return { fala: `${dono[0].toUpperCase() + dono.slice(1)}, ainda não há aparelhos cadastrados. Abra a tela "Casa" e adicione os seus.`, acao: null };
+  if (r.motivo === 'nao_encontrado')
+    return { fala: `Não encontrei "${cmd.alvo}" na sua casa, ${dono}.`, acao: null };
+  if (!r.ok)
+    return { fala: `Não consegui ${cmd.acao === 'desligar' ? 'desligar' : 'ligar'} agora, ${dono}. ${r.falhas?.[0]?.erro || ''}`.trim(), acao: null };
+  const alvoTxt = /tudo|geral/.test((cmd.alvo || '').toLowerCase()) ? 'tudo' : (r.feitos.length > 1 ? r.feitos.join(', ') : r.feitos[0]);
+  const resto = r.falhas?.length ? ` Só não consegui ${r.falhas.map(f => f.nome).join(', ')}.` : '';
+  return { fala: `${verbo} ${alvoTxt}, ${dono}.${resto}`, acao: null };
+}
+
+app.post('/api/chat', async (req, res) => {
+  const { text, history } = req.body || {};
+  const texto = String(text || '').trim();
+  if (!texto) return res.status(400).json({ error: 'texto vazio' });
+  log('🗣️ ', texto);
+
+  // 0) comandos instantâneos (hora, data, trocar interface)
+  const instantanea = respostaRapida(texto);
+  if (instantanea) return res.json({ ...instantanea, cerebro: 'local' });
+
+  // 0b) casa inteligente: liga/desliga aparelhos (executado no servidor)
+  const cmdCasa = casa.comandoDoTexto(texto);
+  if (cmdCasa) {
+    const r = await casa.acionar(cmdCasa.acao, cmdCasa.alvo);
+    return res.json({ ...falaCasa(r, cmdCasa), cerebro: 'casa' });
+  }
+  // avisa quando pede luz/tv mas nada foi configurado ainda
+  if (/\b(liga|ligar|ligue|acende|desliga|desligar|apaga)\b/i.test(texto) && /\b(luz|lâmpada|lampada|tv|televis|tomada|ar.?condicionado|ventilador|abajur)\b/i.test(texto) && !casa.listar().length)
+    return res.json({ fala: `${NOME_DONO[0].toUpperCase() + NOME_DONO.slice(1)}, ainda não cadastrei seus aparelhos. Abra a tela "Casa" (botão da casinha) e adicione a luz, a TV e o que mais quiser controlar.`, acao: null, cerebro: 'casa' });
+
+  // 1) Muse, se estiver conectado lendo a fila
+  if (museOnline()) {
+    const r = await esperarMuse(enfileirar(texto), Number(process.env.MUSE_ESPERA_MS || 25000));
+    if (r && r.response) {
+      log('🧠 muse:', r.response);
+      return res.json({ fala: r.response, acao: r.control || null, audio_url: r.audio_url || null, cerebro: 'muse' });
+    }
+    log('⚠️  Muse não respondeu a tempo, usando IA reserva');
+  }
+
+  const rapida = respostaRapida(texto);
+  const cerebros = cerebrosDisponiveis();
+  if (!cerebros.length) {
+    if (rapida) return res.json({ ...rapida, cerebro: 'local' });
+    return res.json({
+      fala: `${NOME_DONO[0].toUpperCase() + NOME_DONO.slice(1)}, meu cérebro está desligado. Configure a chave GROQ_API_KEY para eu poder pensar.`,
+      acao: null, cerebro: 'nenhum', erro: 'sem_chave'
+    });
+  }
+
+  // 2) IAs reserva, em ordem, até uma funcionar
+  const msgs = montarMensagens(texto, history);
+  let ultimoErro = '';
+  for (const c of cerebros) {
+    try {
+      const r = await pensarComFerramentas(c, msgs);
+      let fala = String(r?.fala || r?.resposta || r?.response || '').trim();
+      // ação de casa vinda do cérebro: executa no servidor
+      if (r.acao && r.acao.tipo === 'casa') {
+        const rc = await casa.acionar(r.acao.acao, r.acao.alvo || r.acao.aparelho || 'tudo');
+        const fc = falaCasa(rc, { acao: r.acao.acao, alvo: r.acao.alvo });
+        return res.json({ ...fc, cerebro: c.nome });
+      }
+      if (!fala) throw new Error('resposta vazia');
+      log(`🧠 ${c.nome}:`, fala, r.acao ? JSON.stringify(r.acao) : '');
+      return res.json({ fala, acao: r.acao || null, cerebro: c.nome, ferramentas: r.ferramentas });
+    } catch (e) {
+      ultimoErro = `${c.nome}: ${e.message}`;
+      log('❌', ultimoErro);
+    }
+  }
+  if (rapida) return res.json({ ...rapida, cerebro: 'local' });
+  const det = ultimoErro || groqErro || '';
+  const chaveRuim = /401|invalid|api key|unauthor|no api key/i.test(det);
+  const falaErro = chaveRuim
+    ? `${NOME_DONO[0].toUpperCase() + NOME_DONO.slice(1)}, minha chave de acesso foi recusada. Confira a GROQ_API_KEY.`
+    : `Desculpe, ${NOME_DONO}, meu cérebro não respondeu. Tente de novo em instantes.`;
+  res.json({ fala: falaErro, acao: null, cerebro: 'erro', erro: chaveRuim ? 'chave_invalida' : 'falha', detalhe: det });
+});
+
+// ═══════════════════════════════════════════════════════════════
+//  VOZ — Piper (Faber PT-BR)
+// ═══════════════════════════════════════════════════════════════
+const PIPER_DIR = path.join(__dirname, 'system', process.platform === 'win32' ? 'piper-windows' : 'piper');
+const PIPER_BIN = path.join(PIPER_DIR, process.platform === 'win32' ? 'piper.exe' : 'piper');
+const VOZ = [path.join(PIPER_DIR, 'pt_BR-faber-medium.onnx'), path.join(__dirname, 'system', 'piper', 'pt_BR-faber-medium.onnx')].find(f => fs.existsSync(f));
+const piperExiste = () => ['linux', 'win32'].includes(process.platform) && fs.existsSync(PIPER_BIN) && !!VOZ;
+
+function limparParaFala(t) {
+  return String(t).replace(/[*_#`>~]/g, '').replace(/https?:\/\/\S+/g, '').replace(/[\u{1F300}-\u{1FAFF}\u{2600}-\u{27BF}]/gu, '').trim().slice(0, 1200);
+}
+
+function falarPiper(texto) {
+  return new Promise((resolve, reject) => {
+    const saida = path.join(os.tmpdir(), `jarvis-${Date.now()}-${novoId()}.wav`);
+    const args = ['--model', VOZ, '--output_file', saida, '--length_scale', process.env.VOZ_VELOCIDADE || '0.92', '--sentence_silence', '0.15'];
+    const espeak = path.join(PIPER_DIR, 'espeak-ng-data');
+    if (fs.existsSync(espeak)) args.push('--espeak_data', espeak);
+    const env = { ...process.env, LD_LIBRARY_PATH: [PIPER_DIR, process.env.LD_LIBRARY_PATH].filter(Boolean).join(':'), DYLD_LIBRARY_PATH: PIPER_DIR };
+    const p = spawn(PIPER_BIN, args, { env, cwd: PIPER_DIR });
+    let stderr = '';
+    p.stderr.on('data', d => stderr += d);
+    p.on('error', reject);
+    p.on('close', code => {
+      if (code !== 0 || !fs.existsSync(saida)) return reject(new Error(`piper código ${code}: ${stderr.slice(-300)}`));
+      const audio = fs.readFileSync(saida);
+      fs.unlink(saida, () => {});
+      resolve(audio);
+    });
+    p.stdin.write(texto);
+    p.stdin.end();
+  });
+}
+
+// ── Voz premium ElevenLabs (grave e natural, estilo dos vídeos) ──
+// Voz padrão: "Adam" (masculina grave). Troque em ELEVENLABS_VOICE_ID.
+const ELEVEN_KEY = process.env.ELEVENLABS_API_KEY || '';
+const ELEVEN_VOICE = process.env.ELEVENLABS_VOICE_ID || 'pNInz6obpgDQGcFmaJgB';
+const ELEVEN_MODELO = process.env.ELEVENLABS_MODELO || 'eleven_multilingual_v2';
+const temEleven = () => !!ELEVEN_KEY;
+
+async function falarEleven(texto) {
+  const r = await fetch(`https://api.elevenlabs.io/v1/text-to-speech/${ELEVEN_VOICE}?output_format=mp3_44100_128`, {
+    method: 'POST',
+    headers: { 'xi-api-key': ELEVEN_KEY, 'Content-Type': 'application/json', Accept: 'audio/mpeg' },
+    body: JSON.stringify({
+      text: texto, model_id: ELEVEN_MODELO,
+      voice_settings: { stability: 0.4, similarity_boost: 0.8, style: 0.35, use_speaker_boost: true }
+    }),
+    signal: AbortSignal.timeout(30000)
+  });
+  if (!r.ok) { const t = await r.text().catch(() => ''); throw new Error(`eleven HTTP ${r.status} ${t.slice(0, 160)}`); }
+  return Buffer.from(await r.arrayBuffer());
+}
+
+function vozMotor() { return temEleven() ? 'eleven' : piperExiste() ? 'faber' : 'navegador'; }
+
+async function rotaTTS(req, res) {
+  const texto = limparParaFala(req.body?.text || '');
+  if (!texto) return res.status(400).json({ error: 'text required' });
+  // 1) ElevenLabs (voz premium), se tiver chave
+  if (temEleven()) {
+    try {
+      const audio = await falarEleven(texto);
+      return res.set('Content-Type', 'audio/mpeg').send(audio);
+    } catch (e) { log('❌ eleven:', e.message); } // cai para o Piper
+  }
+  // 2) Piper (voz grátis)
+  if (piperExiste()) {
+    try {
+      const audio = await falarPiper(texto);
+      return res.set('Content-Type', 'audio/wav').send(audio);
+    } catch (e) { log('❌ piper:', e.message); }
+  }
+  res.status(503).json({ error: 'sem_voz' }); // 3) cliente usa a voz do navegador
+}
+app.post('/api/tts', rotaTTS);
+app.post('/api/piper-tts', rotaTTS); // nome antigo
+
+// ═══════════════════════════════════════════════════════════════
+//  OUVIDO RESERVA — Groq Whisper (para navegadores sem
+//  reconhecimento de voz, ex.: Firefox, Brave, Safari antigo)
+// ═══════════════════════════════════════════════════════════════
+const upload = multer({ dest: os.tmpdir(), limits: { fileSize: 15 * 1024 * 1024 } });
+
+app.post('/api/transcribe', upload.single('audio'), async (req, res) => {
+  const apagar = () => { if (req.file) fs.unlink(req.file.path, () => {}); };
+  const chave = process.env.GROQ_API_KEY;
+  if (!chave) { apagar(); return res.status(503).json({ error: 'sem_chave', mensagem: 'Configure GROQ_API_KEY para transcrever áudio.' }); }
+  if (!req.file) return res.status(400).json({ error: 'sem_audio' });
+  try {
+    const tipo = req.file.mimetype || 'audio/webm';
+    const ext = tipo.includes('mp4') ? 'mp4' : tipo.includes('ogg') ? 'ogg' : tipo.includes('wav') ? 'wav' : 'webm';
+    const bytes = fs.readFileSync(req.file.path);
+    const modelos = [...new Set([process.env.WHISPER_MODELO, 'whisper-large-v3-turbo', 'whisper-large-v3'].filter(Boolean))];
+    let ultimo = '';
+    for (const modelo of modelos) {
+      const fd = new FormData();
+      fd.append('file', new Blob([bytes], { type: tipo }), `audio.${ext}`);
+      fd.append('model', modelo);
+      fd.append('language', 'pt');
+      fd.append('response_format', 'json');
+      const r = await fetch('https://api.groq.com/openai/v1/audio/transcriptions', {
+        method: 'POST', headers: { Authorization: `Bearer ${chave.trim()}` }, body: fd, signal: AbortSignal.timeout(30000)
+      });
+      const d = await r.json().catch(() => ({}));
+      if (r.ok) { apagar(); return res.json({ text: (d.text || '').trim() }); }
+      ultimo = d.error?.message || `HTTP ${r.status}`;
+      log('⚠️ whisper', modelo, ultimo);
+      if (/401|invalid|api key|unauthor/i.test(ultimo)) break;
+    }
+    apagar();
+    return res.status(502).json({ error: 'groq_falhou', mensagem: ultimo });
+  } catch (e) {
+    apagar();
+    res.status(500).json({ error: 'erro', mensagem: e.message });
+  }
+});
+
+// ═══════════════════════════════════════════════════════════════
+//  VISÃO DE TELA — descreve o que aparece na tela do usuário
+//  (ele compartilha a própria tela; a imagem vai para o Groq Vision)
+// ═══════════════════════════════════════════════════════════════
+app.post('/api/visao', async (req, res) => {
+  const chave = process.env.GROQ_API_KEY;
+  if (!chave) return res.status(503).json({ error: 'sem_chave', mensagem: 'Configure GROQ_API_KEY para a visão.' });
+  const { imagem, pergunta, continuo } = req.body || {};
+  if (!imagem || !/^data:image\//.test(imagem)) return res.status(400).json({ error: 'sem_imagem' });
+  const instrucao = pergunta
+    ? `O ${NOME_DONO} está compartilhando a tela dele e perguntou: "${pergunta}". Responda com base no que você vê na imagem.`
+    : `Descreva de forma breve e natural o que o ${NOME_DONO} está vendo nesta tela dele${continuo ? ', focando no que parece ser o principal ou no que mudou' : ''}.`;
+  try {
+    const r = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${chave}` },
+      body: JSON.stringify({
+        model: process.env.GROQ_VISAO_MODELO || 'meta-llama/llama-4-scout-17b-16e-instruct',
+        temperature: 0.4, max_tokens: 220,
+        messages: [
+          { role: 'system', content: `Você é o J.A.R.V.I.S., assistente do ${NOME_DONO}. Fale português do Brasil, chame-o de "${NOME_DONO}". Sua resposta é falada em voz alta: no máximo 2 frases, sem listas nem markdown. Descreva só o que realmente aparece na imagem; não invente. Se a imagem estiver ilegível, diga isso.` },
+          { role: 'user', content: [{ type: 'text', text: instrucao }, { type: 'image_url', image_url: { url: imagem } }] }
+        ]
+      }),
+      signal: AbortSignal.timeout(30000)
+    });
+    const d = await r.json().catch(() => ({}));
+    if (!r.ok) return res.status(502).json({ error: 'groq_visao', mensagem: d.error?.message || `HTTP ${r.status}` });
+    res.json({ descricao: String(d.choices?.[0]?.message?.content || '').trim() });
+  } catch (e) {
+    res.status(500).json({ error: 'erro', mensagem: e.message });
+  }
+});
+
+// ═══════════════════════════════════════════════════════════════
+//  COMPUTADOR — só funciona quando o Jarvis roda no seu PC
+//  e o pedido vem do próprio PC (segurança)
+// ═══════════════════════════════════════════════════════════════
+const APPS = {
+  win32: {
+    'calculadora': 'calc', 'bloco de notas': 'notepad', 'explorador': 'explorer', 'navegador': 'https://www.google.com',
+    'paint': 'mspaint', 'terminal': 'cmd', 'configuracoes': 'ms-settings:', 'spotify': 'spotify:', 'vscode': 'code',
+    'word': 'winword', 'excel': 'excel', 'powerpoint': 'powerpnt', 'whatsapp': 'whatsapp:'
+  },
+  darwin: {
+    'calculadora': 'Calculator', 'bloco de notas': 'TextEdit', 'explorador': 'Finder', 'navegador': 'Safari',
+    'terminal': 'Terminal', 'configuracoes': 'System Settings', 'spotify': 'Spotify', 'vscode': 'Visual Studio Code',
+    'word': 'Microsoft Word', 'excel': 'Microsoft Excel', 'powerpoint': 'Microsoft PowerPoint', 'whatsapp': 'WhatsApp'
+  },
+  linux: { 'calculadora': 'gnome-calculator', 'bloco de notas': 'gedit', 'explorador': 'nautilus', 'terminal': 'gnome-terminal', 'vscode': 'code' }
+};
+
+function normalizarApp(nome) {
+  const n = String(nome || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').trim();
+  const sinonimos = { 'calculator': 'calculadora', 'notepad': 'bloco de notas', 'bloco': 'bloco de notas', 'arquivos': 'explorador', 'pastas': 'explorador',
+    'chrome': 'navegador', 'google chrome': 'navegador', 'cmd': 'terminal', 'prompt': 'terminal', 'configuracao': 'configuracoes', 'vs code': 'vscode', 'visual studio code': 'vscode' };
+  return sinonimos[n] || n;
+}
+
+function abrirNoPC(alvo, ehApp) {
+  const plat = process.platform;
+  let cmd, args;
+  if (plat === 'win32') { cmd = 'cmd'; args = ['/c', 'start', '""', alvo]; }
+  else if (plat === 'darwin') { cmd = 'open'; args = ehApp && !/^[a-z]+:/i.test(alvo) ? ['-a', alvo] : [alvo]; }
+  else { cmd = ehApp && !/^[a-z]+:/i.test(alvo) ? alvo : 'xdg-open'; args = cmd === alvo ? [] : [alvo]; }
+  const p = spawn(cmd, args, { detached: true, stdio: 'ignore', windowsVerbatimArguments: plat === 'win32', shell: false });
+  p.on('error', e => log('❌ abrir:', e.message));
+  p.unref();
+}
+
+// volume, mídia e bloqueio de tela
+function comandoSistema(cmd) {
+  const plat = process.platform;
+  const rodar = (bin, args) => { const p = spawn(bin, args, { detached: true, stdio: 'ignore', windowsHide: true }); p.on('error', e => log('❌ sistema:', e.message)); p.unref(); };
+  if (plat === 'win32') {
+    const teclas = { volume_mais: 175, volume_menos: 174, mudo: 173, play_pause: 179, proxima: 176, anterior: 177 };
+    if (cmd === 'bloquear') { rodar('rundll32.exe', ['user32.dll,LockWorkStation']); return true; }
+    if (teclas[cmd]) {
+      const vezes = cmd.startsWith('volume_') && cmd !== 'mudo' ? 5 : 1;
+      rodar('powershell', ['-NoProfile', '-WindowStyle', 'Hidden', '-Command', `$w=New-Object -ComObject WScript.Shell; 1..${vezes} | % { $w.SendKeys([char]${teclas[cmd]}) }`]);
+      return true;
+    }
+  }
+  if (plat === 'darwin') {
+    const as = {
+      volume_mais: 'set volume output volume ((output volume of (get volume settings)) + 10)',
+      volume_menos: 'set volume output volume ((output volume of (get volume settings)) - 10)',
+      mudo: 'set volume output muted (not (output muted of (get volume settings)))'
+    };
+    if (as[cmd]) { rodar('osascript', ['-e', as[cmd]]); return true; }
+    if (cmd === 'bloquear') { rodar('pmset', ['displaysleepnow']); return true; }
+  }
+  return false;
+}
+
+const pedidoDoProprioPC = (req) => ['127.0.0.1', '::1', '::ffff:127.0.0.1'].includes(req.socket.remoteAddress);
+
+app.post('/api/pc/acao', (req, res) => {
+  if (NA_NUVEM) return res.json({ ok: false, motivo: 'nuvem' });
+  if (!pedidoDoProprioPC(req)) return res.status(403).json({ ok: false, motivo: 'so_no_proprio_pc' });
+  const a = req.body || {};
+  try {
+    if (a.tipo === 'abrir_app') {
+      const nome = normalizarApp(a.nome);
+      const alvo = (APPS[process.platform] || {})[nome];
+      if (!alvo) return res.json({ ok: false, motivo: 'app_desconhecido' });
+      abrirNoPC(alvo, true);
+      log('💻 abrindo app:', nome);
+      return res.json({ ok: true });
+    }
+    if (a.tipo === 'sistema') {
+      const ok = comandoSistema(String(a.comando || ''));
+      log('💻 sistema:', a.comando, ok ? 'ok' : 'não suportado');
+      return res.json({ ok });
+    }
+    if (a.url && /^https?:\/\//i.test(a.url)) {
+      abrirNoPC(a.url, false);
+      log('💻 abrindo site:', a.url);
+      return res.json({ ok: true });
+    }
+    res.json({ ok: false, motivo: 'acao_invalida' });
+  } catch (e) {
+    res.json({ ok: false, motivo: e.message });
+  }
+});
+
+// ═══════════════════════════════════════════════════════════════
+//  CASA — configuração dos aparelhos (tela /casa)
+// ═══════════════════════════════════════════════════════════════
+app.get('/api/casa', (req, res) => res.json({ dispositivos: casa.lerConfig().dispositivos, ha: { url: casa.lerConfig().ha?.url || '', temToken: !!casa.lerConfig().ha?.token } }));
+app.post('/api/casa', (req, res) => {
+  try { res.json({ ok: true, config: casa.salvarConfig(req.body || {}) }); }
+  catch (e) { res.status(500).json({ ok: false, erro: e.message }); }
+});
+app.post('/api/casa/testar', async (req, res) => {
+  const { acao, alvo } = req.body || {};
+  res.json(await casa.acionar(acao || 'ligar', alvo || ''));
+});
+
+// Clima e cotações para o painel do HUD
+app.get('/api/painel', async (req, res) => {
+  try { res.json(await painel()); } catch { res.json({ clima: null, cotacao: null }); }
+});
+
+// Telemetria real (usada no painel do HUD)
+let cpuAnterior = os.cpus();
+app.get('/api/sistema', (req, res) => {
+  const agora = os.cpus();
+  let ocioso = 0, total = 0;
+  agora.forEach((c, i) => {
+    const a = cpuAnterior[i]?.times || c.times;
+    const dIdle = c.times.idle - a.idle;
+    const dTot = Object.keys(c.times).reduce((s, k) => s + (c.times[k] - (a[k] || 0)), 0);
+    ocioso += dIdle; total += dTot;
+  });
+  cpuAnterior = agora;
+  res.json({
+    cpu: total ? Math.round(100 - (ocioso / total) * 100) : 0,
+    memoria: Math.round((1 - os.freemem() / os.totalmem()) * 100),
+    nucleos: agora.length,
+    ligadoHa: Math.round(os.uptime()),
+    plataforma: process.platform,
+    local: !NA_NUVEM
+  });
+});
+
+// ═══════════════════════════════════════════════════════════════
+//  STATUS
+// ═══════════════════════════════════════════════════════════════
+app.get('/api/health', (req, res) => {
+  const cerebros = cerebrosDisponiveis().map(c => c.nome);
+  res.json({
+    ok: true,
+    onde: NA_NUVEM ? 'nuvem' : 'computador',
+    dono: NOME_DONO,
+    muse: { conectado: museOnline(), pedidos_na_fila: fila.size },
+    cerebro: museOnline() ? 'muse' : (cerebros[0] || 'nenhum'),
+    cerebros_reserva: cerebros,
+    voz_piper: piperExiste(),
+    voz_motor: vozMotor(),
+    transcricao_servidor: !!process.env.GROQ_API_KEY,
+    visao_tela: !!process.env.GROQ_API_KEY,
+    casa_aparelhos: casa.listar().length,
+    comandos_pc: !NA_NUVEM
+  });
+});
+
+app.get('/', (req, res) => res.sendFile(path.join(__dirname, 'public', 'cerebro.html')));
+
+const PORTA = process.env.PORT || 3000;
+app.listen(PORTA, () => {
+  const c = cerebrosDisponiveis().map(x => x.nome);
+  console.log('\n  ╔══════════════════════════════════════╗');
+  console.log('  ║          J.A.R.V.I.S.  ONLINE          ║');
+  console.log('  ╚══════════════════════════════════════╝');
+  console.log(`  Endereço : http://localhost:${PORTA}`);
+  console.log(`  Onde     : ${NA_NUVEM ? 'nuvem' : 'computador (comandos do PC ativos)'}`);
+  console.log(`  Cérebro  : ${c.length ? c.join(' → ') : 'NENHUMA CHAVE — configure GROQ_API_KEY no arquivo .env'} (Muse entra quando conectado)`);
+  console.log(`  Voz      : ${piperExiste() ? 'Piper Faber PT-BR' : 'voz do navegador (Piper não encontrado)'}\n`);
+});
+
+
+
+######################################################################
+### ARQUIVO: ferramentas.js
+######################################################################
+
+// ═══════════════════════════════════════════════════════════════
+//  FERRAMENTAS DO J.A.R.V.I.S. — dados em tempo real, sem chave
+//  clima (Open-Meteo) · cotações (AwesomeAPI) · notícias (Google
+//  Notícias) · Wikipédia · memória de longo prazo
+// ═══════════════════════════════════════════════════════════════
+import fs from 'fs';
+import path from 'path';
+import { fileURLToPath } from 'url';
+
+const pegar = async (url, tipo = 'json') => {
+  const r = await fetch(url, { headers: { 'User-Agent': 'JARVIS/2.0 (assistente pessoal)' }, signal: AbortSignal.timeout(9000) });
+  if (!r.ok) throw new Error(`HTTP ${r.status}`);
+  return tipo === 'json' ? r.json() : r.text();
+};
+
+// ── CLIMA ──────────────────────────────────────────────────────
+const CODIGOS = {
+  0: 'céu limpo', 1: 'predominantemente limpo', 2: 'parcialmente nublado', 3: 'nublado', 45: 'neblina', 48: 'neblina',
+  51: 'garoa fraca', 53: 'garoa', 55: 'garoa forte', 61: 'chuva fraca', 63: 'chuva', 65: 'chuva forte',
+  66: 'chuva congelante', 67: 'chuva congelante', 71: 'neve fraca', 73: 'neve', 75: 'neve forte',
+  80: 'pancadas de chuva', 81: 'pancadas de chuva', 82: 'pancadas fortes de chuva', 95: 'trovoadas', 96: 'trovoadas com granizo', 99: 'trovoadas com granizo'
+};
+const cacheGeo = new Map();
+export async function clima(cidade) {
+  cidade = String(cidade || '').trim() || process.env.CIDADE_PADRAO || 'Maceió';
+  let geo = cacheGeo.get(cidade.toLowerCase());
+  if (!geo) {
+    const g = await pegar(`https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(cidade)}&count=1&language=pt&format=json`);
+    if (!g.results?.length) return { erro: `cidade "${cidade}" não encontrada` };
+    geo = g.results[0];
+    cacheGeo.set(cidade.toLowerCase(), geo);
+  }
+  const d = await pegar(`https://api.open-meteo.com/v1/forecast?latitude=${geo.latitude}&longitude=${geo.longitude}` +
+    '&current=temperature_2m,apparent_temperature,relative_humidity_2m,weather_code,wind_speed_10m' +
+    '&daily=temperature_2m_max,temperature_2m_min,precipitation_probability_max,weather_code&timezone=auto&forecast_days=2');
+  const c = d.current, dd = d.daily;
+  return {
+    cidade: `${geo.name}${geo.admin1 ? ', ' + geo.admin1 : ''}`,
+    agora: { temperatura: Math.round(c.temperature_2m), sensacao: Math.round(c.apparent_temperature), umidade: c.relative_humidity_2m, vento_kmh: Math.round(c.wind_speed_10m), condicao: CODIGOS[c.weather_code] || 'indefinido' },
+    hoje: { max: Math.round(dd.temperature_2m_max[0]), min: Math.round(dd.temperature_2m_min[0]), chance_chuva: dd.precipitation_probability_max[0], condicao: CODIGOS[dd.weather_code[0]] },
+    amanha: { max: Math.round(dd.temperature_2m_max[1]), min: Math.round(dd.temperature_2m_min[1]), chance_chuva: dd.precipitation_probability_max[1], condicao: CODIGOS[dd.weather_code[1]] }
+  };
+}
+
+// ── COTAÇÕES ───────────────────────────────────────────────────
+const NOMES_MOEDA = { dolar: 'USD', 'dólar': 'USD', usd: 'USD', euro: 'EUR', eur: 'EUR', bitcoin: 'BTC', btc: 'BTC', libra: 'GBP', gbp: 'GBP',
+  iene: 'JPY', ethereum: 'ETH', eth: 'ETH', peso: 'ARS', 'peso argentino': 'ARS', 'dolar canadense': 'CAD', 'franco suico': 'CHF', yuan: 'CNY' };
+export async function cotacao(moedas) {
+  let lista = (Array.isArray(moedas) ? moedas : String(moedas || 'dolar,euro,bitcoin').split(/\s*(?:,|;|\se\s)\s*/))
+    .map(m => NOMES_MOEDA[String(m).trim().toLowerCase()] || String(m).trim().toUpperCase()).filter(m => /^[A-Z]{3}$/.test(m));
+  if (!lista.length) lista = ['USD', 'EUR', 'BTC'];
+  const d = await pegar(`https://economia.awesomeapi.com.br/json/last/${[...new Set(lista)].map(m => m + '-BRL').join(',')}`);
+  const saida = {};
+  for (const k in d) saida[d[k].code] = { nome: d[k].name.split('/')[0], valor_reais: Number(d[k].bid), variacao_pct: Number(d[k].pctChange) };
+  return saida;
+}
+
+// ── NOTÍCIAS ───────────────────────────────────────────────────
+export async function noticias(tema) {
+  const url = tema
+    ? `https://news.google.com/rss/search?q=${encodeURIComponent(tema)}&hl=pt-BR&gl=BR&ceid=BR:pt-419`
+    : 'https://news.google.com/rss?hl=pt-BR&gl=BR&ceid=BR:pt-419';
+  const xml = await pegar(url, 'texto');
+  const itens = [...xml.matchAll(/<item>[\s\S]*?<title>([\s\S]*?)<\/title>[\s\S]*?<\/item>/g)].slice(0, 6)
+    .map(m => m[1].replace(/<!\[CDATA\[|\]\]>/g, '').replace(/&amp;/g, '&').replace(/&quot;/g, '"').replace(/&#39;/g, "'").trim());
+  return { tema: tema || 'principais', manchetes: itens };
+}
+
+// ── WIKIPÉDIA ──────────────────────────────────────────────────
+export async function wikipedia(termo) {
+  const busca = await pegar(`https://pt.wikipedia.org/w/api.php?action=opensearch&search=${encodeURIComponent(termo)}&limit=1&namespace=0&format=json`);
+  const titulo = busca?.[1]?.[0];
+  if (!titulo) return { erro: 'nada encontrado' };
+  const r = await pegar(`https://pt.wikipedia.org/api/rest_v1/page/summary/${encodeURIComponent(titulo)}`);
+  return { titulo: r.title, resumo: String(r.extract || '').slice(0, 1200) };
+}
+
+// ── MEMÓRIA DE LONGO PRAZO ─────────────────────────────────────
+const PASTA = process.env.PASTA_DADOS || path.join(path.dirname(fileURLToPath(import.meta.url)), 'dados');
+const ARQ = path.join(PASTA, 'memoria.json');
+export function lerMemoria() {
+  try { return JSON.parse(fs.readFileSync(ARQ, 'utf8')); } catch { return []; }
+}
+export function lembrar(fato) {
+  fato = String(fato || '').trim().slice(0, 300);
+  if (!fato) return { erro: 'fato vazio' };
+  const m = lerMemoria().filter(x => x.fato.toLowerCase() !== fato.toLowerCase());
+  m.push({ fato, quando: new Date().toISOString() });
+  fs.mkdirSync(PASTA, { recursive: true });
+  fs.writeFileSync(ARQ, JSON.stringify(m.slice(-80), null, 2));
+  return { ok: true, total: m.length };
+}
+export function esquecer(trecho) {
+  const t = String(trecho || '').toLowerCase().trim();
+  const antes = lerMemoria();
+  const depois = t ? antes.filter(x => !x.fato.toLowerCase().includes(t)) : antes;
+  fs.mkdirSync(PASTA, { recursive: true });
+  fs.writeFileSync(ARQ, JSON.stringify(depois, null, 2));
+  return { removidos: antes.length - depois.length };
+}
+
+// ── DESPACHO ───────────────────────────────────────────────────
+export async function executarFerramenta(f) {
+  const nome = String(f?.nome || '').toLowerCase();
+  try {
+    if (nome === 'clima') return await clima(f.cidade);
+    if (nome === 'cotacao') return await cotacao(f.moedas);
+    if (nome === 'noticias') return await noticias(f.tema);
+    if (nome === 'wikipedia') return await wikipedia(f.termo || f.tema);
+    if (nome === 'lembrar') return lembrar(f.fato);
+    if (nome === 'esquecer') return esquecer(f.trecho || f.fato);
+    if (nome === 'memoria') return { fatos: lerMemoria().map(x => x.fato) };
+    return { erro: 'ferramenta desconhecida' };
+  } catch (e) {
+    return { erro: `falha ao consultar: ${e.message}` };
+  }
+}
+
+// ── PAINEL (dados do HUD, com cache de 10 min) ────────────────
+let painelCache = { t: 0, dados: null };
+export async function painel() {
+  if (painelCache.dados && Date.now() - painelCache.t < 600000) return painelCache.dados;
+  const [c, q] = await Promise.allSettled([clima(), cotacao(['USD', 'EUR', 'BTC'])]);
+  const dados = { clima: c.status === 'fulfilled' && !c.value.erro ? c.value : null, cotacao: q.status === 'fulfilled' ? q.value : null };
+  if (dados.clima || dados.cotacao) painelCache = { t: Date.now(), dados };
+  return dados;
+}
+
+
+
+######################################################################
+### ARQUIVO: casa.js
+######################################################################
+
+// ═══════════════════════════════════════════════════════════════
+//  CASA INTELIGENTE — liga/desliga aparelhos (luz, TV, tomada…)
+//  Funciona de dois jeitos, sem programar:
+//   1) WEBHOOK: você cola o link "ligar" e "desligar" de cada
+//      aparelho (IFTTT, Tuya/Smart Life, SmartThings, Home
+//      Assistant, etc.). Mais fácil e funciona pela nuvem.
+//   2) HOME ASSISTANT: endereço + token e o id da entidade.
+//  Config: arquivo dados/casa.json (editável pela tela /casa) e/ou
+//  a variável de ambiente CASA_JSON (persistente no Render).
+// ═══════════════════════════════════════════════════════════════
+import fs from 'fs';
+import path from 'path';
+import { fileURLToPath } from 'url';
+
+const DIR = process.env.PASTA_DADOS || path.join(path.dirname(fileURLToPath(import.meta.url)), 'dados');
+const ARQ = path.join(DIR, 'casa.json');
+
+const semAcento = s => String(s || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').trim();
+
+export function lerConfig() {
+  let cfg = { dispositivos: [], ha: {} };
+  try { cfg = { ...cfg, ...JSON.parse(fs.readFileSync(ARQ, 'utf8')) }; } catch {}
+  if (process.env.CASA_JSON) {
+    try {
+      const env = JSON.parse(process.env.CASA_JSON);
+      const porNome = new Map(cfg.dispositivos.map(d => [semAcento(d.nome), d]));
+      for (const d of (env.dispositivos || [])) porNome.set(semAcento(d.nome), d);
+      cfg.dispositivos = [...porNome.values()];
+      if (env.ha) cfg.ha = { ...cfg.ha, ...env.ha };
+    } catch {}
+  }
+  return cfg;
+}
+
+export function salvarConfig(cfg) {
+  fs.mkdirSync(DIR, { recursive: true });
+  const limpo = {
+    dispositivos: (cfg.dispositivos || []).filter(d => d && d.nome).slice(0, 60).map(d => ({
+      nome: String(d.nome).slice(0, 40),
+      tipo: d.tipo === 'ha' ? 'ha' : 'webhook',
+      ligar: String(d.ligar || '').slice(0, 500),
+      desligar: String(d.desligar || '').slice(0, 500),
+      metodo: /^(GET|POST)$/i.test(d.metodo) ? d.metodo.toUpperCase() : 'POST',
+      entidade: String(d.entidade || '').slice(0, 80)
+    })),
+    ha: { url: String(cfg.ha?.url || '').slice(0, 300), token: String(cfg.ha?.token || '').slice(0, 400) }
+  };
+  fs.writeFileSync(ARQ, JSON.stringify(limpo, null, 2));
+  return limpo;
+}
+
+export function listar() {
+  const cfg = lerConfig();
+  return cfg.dispositivos.map(d => ({ nome: d.nome, tipo: d.tipo, temLigar: !!(d.ligar || d.entidade), temDesligar: !!(d.desligar || d.entidade) }));
+}
+
+function achar(cfg, alvo) {
+  const a = semAcento(alvo);
+  if (!a) return [];
+  if (/\b(tudo|tudos|geral|casa inteira)\b/.test(a)) return cfg.dispositivos.slice();
+  // casamento por nome contido (nos dois sentidos)
+  const exato = cfg.dispositivos.filter(d => semAcento(d.nome) === a);
+  if (exato.length) return exato;
+  return cfg.dispositivos.filter(d => { const n = semAcento(d.nome); return n && (a.includes(n) || n.includes(a)); });
+}
+
+async function acionarUm(cfg, d, acao) {
+  const ligar = acao === 'ligar';
+  if (d.tipo === 'ha') {
+    const base = (cfg.ha?.url || '').replace(/\/+$/, '');
+    if (!base || !cfg.ha?.token) throw new Error('Home Assistant não configurado');
+    const dominio = (d.entidade || '').split('.')[0] || 'homeassistant';
+    const r = await fetch(`${base}/api/services/${dominio}/${ligar ? 'turn_on' : 'turn_off'}`, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${cfg.ha.token}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ entity_id: d.entidade }),
+      signal: AbortSignal.timeout(9000)
+    });
+    if (!r.ok) throw new Error(`HA HTTP ${r.status}`);
+    return true;
+  }
+  const url = ligar ? d.ligar : d.desligar;
+  if (!url) throw new Error(`sem link de ${ligar ? 'ligar' : 'desligar'} para ${d.nome}`);
+  const r = await fetch(url, { method: d.metodo || 'POST', signal: AbortSignal.timeout(9000) });
+  if (!r.ok) throw new Error(`HTTP ${r.status}`);
+  return true;
+}
+
+// acao: 'ligar' | 'desligar' ; alvo: nome do aparelho ou "tudo"
+export async function acionar(acao, alvo) {
+  const cfg = lerConfig();
+  if (!cfg.dispositivos.length) return { ok: false, motivo: 'nenhum_dispositivo' };
+  acao = acao === 'desligar' ? 'desligar' : 'ligar';
+  const alvos = achar(cfg, alvo);
+  if (!alvos.length) return { ok: false, motivo: 'nao_encontrado', alvo };
+  const feitos = [], falhas = [];
+  for (const d of alvos) {
+    try { await acionarUm(cfg, d, acao); feitos.push(d.nome); }
+    catch (e) { falhas.push({ nome: d.nome, erro: e.message }); }
+  }
+  return { ok: feitos.length > 0, acao, feitos, falhas };
+}
+
+// Detecta "liga/desliga <aparelho>" no texto, só se houver aparelho configurado.
+export function comandoDoTexto(texto) {
+  const t = semAcento(texto);
+  const desliga = /\b(desliga|desligar|desligue|apaga|apague|apagar|desativa|desativar|desative)\b/.test(t);
+  const liga = /\b(liga|ligar|ligue|acende|acenda|acender|ativa|ativar|ative|abre a luz)\b/.test(t);
+  if (!liga && !desliga) return null;
+  const cfg = lerConfig();
+  if (!cfg.dispositivos.length) return null;
+  const acao = desliga ? 'desligar' : 'ligar';
+  if (/\b(tudo|geral|casa inteira|todas as luzes|tudos)\b/.test(t)) return { acao, alvo: 'tudo' };
+  // procura algum aparelho configurado citado no texto
+  const bate = cfg.dispositivos.find(d => { const n = semAcento(d.nome); return n && t.includes(n); });
+  if (bate) return { acao, alvo: bate.nome };
+  // palavras-chave comuns que batem com um aparelho configurado
+  for (const chave of ['luz', 'lampada', 'tv', 'televisao', 'tomada', 'ar condicionado', 'ventilador', 'som']) {
+    if (t.includes(chave)) {
+      const d = cfg.dispositivos.find(x => semAcento(x.nome).includes(chave));
+      if (d) return { acao, alvo: d.nome };
+    }
+  }
+  return null;
+}
+
+
+
+######################################################################
+### ARQUIVO: public/cerebro.html
+######################################################################
+
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="theme-color" content="#081226">
+<title>J.A.R.V.I.S.</title>
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<link rel="icon" href="icone-192.png">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="JARVIS">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Rajdhani:wght@400;500;600&family=Inter:wght@300;400;500&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --fundo: #081226;
+    --fundo-borda: #040913;
+    --azul: #7db8ff;
+    --azul-forte: #4d9bff;
+    --azul-fraco: rgba(125, 184, 255, .45);
+    --linha: rgba(125, 184, 255, .14);
+    --texto: #eaf3ff;
+    --perigo: #ff6b6b;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html, body { height: 100%; }
+  body {
+    background: radial-gradient(ellipse at 50% 45%, #10224a 0%, var(--fundo) 45%, var(--fundo-borda) 100%);
+    color: var(--texto);
+    overflow: hidden;
+    font-family: 'Inter', system-ui, sans-serif;
+    user-select: none;
+  }
+  #esfera { position: fixed; inset: 0; width: 100%; height: 100%; display: block; }
+
+  /* ── HUD ─────────────────────────────── */
+  .hud { position: fixed; z-index: 5; font-family: 'Rajdhani', sans-serif; letter-spacing: .18em; text-transform: uppercase; color: var(--azul-fraco); font-size: 12px; line-height: 1.6; pointer-events: none; }
+  .hud b { color: var(--azul); font-weight: 600; }
+  #hudTL { top: max(18px, env(safe-area-inset-top)); left: 20px; }
+  #hudTR { top: max(18px, env(safe-area-inset-top)); right: 20px; text-align: right; }
+  #hudBL { bottom: max(22px, env(safe-area-inset-bottom)); left: 20px; }
+  .marca { font-size: 15px; color: var(--azul); letter-spacing: .5em; font-weight: 500; }
+  .barra { display: inline-block; width: 70px; height: 3px; background: var(--linha); vertical-align: middle; margin-left: 8px; position: relative; overflow: hidden; }
+  .barra i { position: absolute; left: 0; top: 0; bottom: 0; background: var(--azul); width: 0; transition: width .6s; }
+  #relogio { font-size: 22px; color: var(--azul); letter-spacing: .12em; }
+
+  #estado {
+    position: fixed; top: max(18px, env(safe-area-inset-top)); left: 50%; transform: translateX(-50%); z-index: 5;
+    font-family: 'Rajdhani', sans-serif; letter-spacing: .45em; font-size: 12px; color: var(--azul);
+    padding: 5px 4px 5px 16px; border-top: 1px solid var(--linha); border-bottom: 1px solid var(--linha);
+    pointer-events: none; white-space: nowrap;
+  }
+  #estado::before { content: ''; display: inline-block; width: 6px; height: 6px; border-radius: 50%; background: var(--azul); margin-right: 10px; vertical-align: 1px; box-shadow: 0 0 8px var(--azul); }
+  #estado.pulsa::before { animation: piscar 1s infinite; }
+  @keyframes piscar { 50% { opacity: .2; } }
+
+  /* ── Legendas ─────────────────────────── */
+  #legendas { position: fixed; left: 50%; transform: translateX(-50%); bottom: calc(118px + env(safe-area-inset-bottom)); width: min(760px, calc(100% - 32px)); text-align: center; z-index: 6; pointer-events: none; }
+  #legVoce { font-size: 13px; color: var(--azul-fraco); letter-spacing: .04em; min-height: 18px; margin-bottom: 8px; transition: opacity .4s; }
+  #legVoce.interim { font-style: italic; }
+  #legJarvis { font-size: clamp(17px, 2.3vw, 24px); font-weight: 500; color: var(--texto); text-shadow: 0 2px 14px rgba(0,0,0,.8); line-height: 1.35; min-height: 32px; }
+  #legJarvis.erro { color: #ffd0d0; font-size: 15px; }
+  #link { display: none; margin-top: 12px; pointer-events: auto; }
+  #link a { color: var(--azul); font-family: 'Rajdhani', sans-serif; letter-spacing: .2em; font-size: 13px; text-decoration: none; border: 1px solid var(--azul-fraco); padding: 7px 16px; display: inline-block; }
+
+  /* ── Controles (fileira de pontos como no vídeo) ── */
+  #controles { position: fixed; left: 50%; transform: translateX(-50%); bottom: max(24px, env(safe-area-inset-bottom)); display: flex; align-items: center; gap: 18px; z-index: 7; }
+  .ponto { width: 34px; height: 34px; border-radius: 50%; border: 1px solid var(--linha); background: rgba(10, 25, 55, .5); color: var(--azul-fraco); display: grid; place-items: center; cursor: pointer; transition: all .25s; }
+  .ponto:hover, .ponto.ativo { color: var(--azul); border-color: var(--azul-fraco); }
+  .ponto svg { width: 15px; height: 15px; }
+  .mini { width: 5px; height: 5px; border-radius: 50%; background: var(--azul-fraco); opacity: .6; }
+  #btnMic { width: 58px; height: 58px; border-color: var(--azul-fraco); color: var(--azul); }
+  #btnMic svg { width: 22px; height: 22px; }
+  #btnMic.ligado { background: rgba(77, 155, 255, .18); box-shadow: 0 0 0 0 rgba(77,155,255,.5); animation: anel 2s infinite; }
+  @keyframes anel { 0% { box-shadow: 0 0 0 0 rgba(77,155,255,.45); } 100% { box-shadow: 0 0 0 18px rgba(77,155,255,0); } }
+
+  #formTexto { position: fixed; left: 50%; transform: translateX(-50%); bottom: calc(96px + env(safe-area-inset-bottom)); width: min(560px, calc(100% - 32px)); z-index: 8; display: none; }
+  #formTexto.aberto { display: block; }
+  #formTexto input { width: 100%; background: rgba(6, 16, 36, .85); border: 1px solid var(--azul-fraco); color: var(--texto); font: 15px 'Inter', sans-serif; padding: 13px 16px; outline: none; }
+  #formTexto input::placeholder { color: var(--azul-fraco); }
+  body.digitando #legendas { bottom: calc(160px + env(safe-area-inset-bottom)); }
+
+  /* ── Tela inicial ─────────────────────── */
+  #inicio { position: fixed; inset: 0; z-index: 20; display: grid; place-items: center; cursor: pointer; background: rgba(4, 9, 19, .35); transition: opacity .8s; }
+  #inicio.some { opacity: 0; pointer-events: none; }
+  #inicio div { text-align: center; font-family: 'Rajdhani', sans-serif; margin-top: 52vh; }
+  #inicio h1 { font-weight: 500; font-size: 22px; letter-spacing: .9em; color: var(--azul); margin-right: -.9em; }
+  #inicio p { margin-top: 14px; font-size: 12px; letter-spacing: .4em; color: var(--azul-fraco); animation: piscar 2s infinite; }
+
+  @media (max-width: 640px) {
+    .hud { font-size: 10px; }
+    #hudBL { display: none; }
+    #hudCot { display: none; }
+    #controles { gap: 9px; }
+    .ponto { width: 30px; height: 30px; }
+    #btnMic { width: 52px; height: 52px; }
+    #relogio { font-size: 17px; }
+    .marca { font-size: 12px; letter-spacing: .35em; }
+    #estado { top: auto; bottom: calc(96px + env(safe-area-inset-bottom)); font-size: 10px; }
+    #legendas { bottom: calc(136px + env(safe-area-inset-bottom)); }
+    body.digitando #estado { display: none; }
+  }
+  /* ── Temas de cada interface ─────────── */
+  body[data-modo="nucleo"] { --azul:#8fd3ff; --azul-forte:#2fb8ff; --azul-fraco:rgba(143,211,255,.5); --linha:rgba(143,211,255,.16); background:#02060d; }
+  body[data-modo="holograma"] { --azul: #6fe3ff; --azul-forte: #22c8ff; --azul-fraco: rgba(111,227,255,.45); --linha: rgba(111,227,255,.16); background: #02050b; }
+  body[data-modo="tempestade"] { --azul: #e6b8ff; --azul-forte: #b45cff; --azul-fraco: rgba(230,184,255,.5); --linha: rgba(230,184,255,.18); background: #0b0216; }
+  body[data-modo="tempestade"] .ponto { background: rgba(40, 10, 60, .5); }
+  body[data-modo="holograma"] .ponto { background: rgba(4, 20, 30, .55); }
+
+  #hudClima, #hudCot { margin-top: 6px; color: var(--azul); }
+  #hudCot { color: var(--azul-fraco); }
+  #hudTimers div { margin-top: 6px; color: var(--azul); font-size: 13px; }
+  #hudTimers div.fim { animation: piscar .5s infinite; }
+  #hudTela div { margin-top: 6px; color: var(--azul); font-size: 13px; }
+
+  /* legenda palavra por palavra */
+  #legJarvis .w { opacity: .3; transition: opacity .12s; }
+  #legJarvis .w.dita { opacity: 1; }
+  #legJarvis.karaoke { font-weight: 600; font-size: clamp(19px, 2.6vw, 28px); }
+
+  #btnInstalar {
+    position: fixed; top: max(14px, env(safe-area-inset-top)); left: 50%; transform: translateX(-50%); z-index: 25;
+    display: none; background: rgba(77,155,255,.15); color: var(--azul); border: 1px solid var(--azul-fraco);
+    font-family: 'Rajdhani', sans-serif; letter-spacing: .18em; font-size: 12px; padding: 9px 18px; border-radius: 30px;
+    cursor: pointer; backdrop-filter: blur(6px);
+  }
+  #btnInstalar.mostra { display: block; }
+  @media (prefers-reduced-motion: reduce) { #btnMic.ligado { animation: none; } }
+</style>
+</head>
+<body>
+<canvas id="esfera"></canvas>
+
+<div class="hud" id="hudTL">
+  <div class="marca">J.A.R.V.I.S.</div>
+  <div>Cérebro: <b id="hudCerebro">—</b></div>
+  <div>Voz: <b id="hudVoz">—</b></div>
+  <div>Ouvido: <b id="hudOuvido">—</b></div>
+</div>
+<div class="hud" id="hudTR">
+  <div id="relogio">--:--</div>
+  <div id="hudData">—</div>
+  <div><b id="hudOnde">—</b></div>
+  <div id="hudClima"></div>
+  <div id="hudCot"></div>
+  <div id="hudTimers"></div>
+  <div id="hudTela"></div>
+</div>
+<div class="hud" id="hudBL">
+  <div id="hudSisTitulo">Sistema</div>
+  <div>CPU <span class="barra"><i id="barCpu"></i></span> <b id="txtCpu">–</b></div>
+  <div>MEM <span class="barra"><i id="barMem"></i></span> <b id="txtMem">–</b></div>
+  <div>MIC <span class="barra"><i id="barMic"></i></span></div>
+</div>
+
+<div id="estado">EM ESPERA</div>
+
+<div id="legendas">
+  <div id="legVoce"></div>
+  <div id="legJarvis"></div>
+  <div id="link"><a target="_blank" rel="noopener" id="linkA">ABRIR</a></div>
+</div>
+
+<form id="formTexto" autocomplete="off"><input id="campo" placeholder="Digite para o Jarvis e aperte Enter…" enterkeyhint="send"></form>
+
+<div id="controles">
+  <span class="mini"></span>
+  <button class="ponto" id="btnSentinela" title="Modo sentinela: só responde quando você diz Jarvis (S)" aria-label="Modo sentinela"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></svg></button>
+  <button class="ponto" id="btnTeclado" title="Digitar (T)" aria-label="Digitar"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><rect x="2" y="6" width="20" height="12" rx="2"/><path d="M6 10h.01M10 10h.01M14 10h.01M18 10h.01M7 14h10"/></svg></button>
+  <button class="ponto" id="btnMic" title="Falar (Espaço)" aria-label="Ligar microfone"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3"/></svg></button>
+  <button class="ponto" id="btnMudo" title="Silenciar voz (M)" aria-label="Silenciar"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M4 9v6h4l5 4V5L8 9H4z"/><path id="ondas" d="M16.5 8.5a5 5 0 0 1 0 7M19 6a8.5 8.5 0 0 1 0 12"/></svg></button>
+  <button class="ponto" id="btnCamera" title="Modo visão / câmera (C)" aria-label="Modo visão"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg></button>
+  <button class="ponto" id="btnTela" title="Ver minha tela (V)" aria-label="Ver minha tela"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8M12 17v4"/></svg></button>
+  <button class="ponto" id="btnCasa" title="Casa inteligente — aparelhos" aria-label="Casa inteligente"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M3 11l9-8 9 8"/><path d="M5 10v10h14V10"/><path d="M9 20v-6h6v6"/></svg></button>
+  <button class="ponto" id="btnModo" title="Trocar interface (I)" aria-label="Trocar interface"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M12 3 2 8l10 5 10-5-10-5z"/><path d="m2 13 10 5 10-5"/></svg></button>
+  <span class="mini"></span>
+</div>
+
+<div id="inicio"><div><h1>J.A.R.V.I.S.</h1><p>Toque para iniciar</p></div></div>
+<button id="btnInstalar">⬇ INSTALAR NO CELULAR</button>
+
+<script src="visuais.js"></script>
+<script>
+'use strict';
+// ════════════════════════════════════════════════════════════════
+//  VISUAIS (esfera · holograma · violeta) — ficam em visuais.js
+// ════════════════════════════════════════════════════════════════
+const tela = document.getElementById('esfera');
+const celular = /Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent);
+let nivelVoz = 0;          // 0..1 — volume da voz do Jarvis ou sua
+Visual.iniciar(tela, () => nivelVoz);
+let modoSalvo = 'nucleo';
+try { modoSalvo = localStorage.getItem('jarvis_modo') || 'nucleo'; } catch {}
+Visual.modo(modoSalvo);
+function visual(estado) { Visual.estado(estado); }
+
+// ════════════════════════════════════════════════════════════════
+//  INTERFACE
+// ════════════════════════════════════════════════════════════════
+const $ = id => document.getElementById(id);
+const el = { estado: $('estado'), voce: $('legVoce'), jarvis: $('legJarvis'), link: $('link'), linkA: $('linkA'), mic: $('btnMic'), mudo: $('btnMudo'), teclado: $('btnTeclado'), form: $('formTexto'), campo: $('campo'), inicio: $('inicio') };
+
+let estado = 'espera';
+function mudarEstado(e, rotulo) {
+  estado = e;
+  visual(e);
+  el.estado.textContent = rotulo || { espera: 'EM ESPERA', ouvindo: 'OUVINDO', pensando: 'PROCESSANDO', falando: 'RESPONDENDO' }[e];
+  el.estado.classList.toggle('pulsa', e === 'ouvindo' || e === 'pensando');
+}
+function legendaVoce(txt, interim) { el.voce.textContent = txt ? '› ' + txt : ''; el.voce.classList.toggle('interim', !!interim); }
+function legendaJarvis(txt, erro) { el.jarvis.classList.remove('karaoke'); el.jarvis.textContent = txt || ''; el.jarvis.classList.toggle('erro', !!erro); }
+
+function relogio() {
+  const d = new Date();
+  $('relogio').textContent = d.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+  $('hudData').textContent = d.toLocaleDateString('pt-BR', { weekday: 'short', day: '2-digit', month: 'short' }).replace(/\./g, '');
+}
+relogio(); setInterval(relogio, 10000);
+
+// ════════════════════════════════════════════════════════════════
+//  STATUS DO SERVIDOR
+// ════════════════════════════════════════════════════════════════
+let saude = { comandos_pc: false, voz_piper: false, transcricao_servidor: false, cerebro: 'nenhum' };
+async function lerSaude() {
+  try {
+    saude = await (await fetch('/api/health', { cache: 'no-store' })).json();
+    $('hudCerebro').textContent = saude.muse?.conectado ? 'MUSE' : (saude.cerebro || 'nenhum').toUpperCase();
+    $('hudVoz').textContent = mudo ? 'MUDO' : ({ eleven: 'PREMIUM', faber: 'FABER' }[saude.voz_motor] || 'NAVEGADOR');
+    $('hudOnde').textContent = saude.onde === 'computador' ? 'PC LOCAL' : 'NUVEM';
+    $('hudSisTitulo').textContent = saude.onde === 'computador' ? 'Sistema · PC' : 'Sistema · Servidor';
+  } catch { $('hudOnde').textContent = 'OFFLINE'; }
+}
+async function lerSistema() {
+  try {
+    const s = await (await fetch('/api/sistema', { cache: 'no-store' })).json();
+    $('barCpu').style.width = s.cpu + '%'; $('txtCpu').textContent = s.cpu + '%';
+    $('barMem').style.width = s.memoria + '%'; $('txtMem').textContent = s.memoria + '%';
+  } catch {}
+}
+lerSaude(); lerSistema();
+setInterval(lerSaude, 15000); setInterval(lerSistema, 3000);
+
+// ════════════════════════════════════════════════════════════════
+//  ÁUDIO
+// ════════════════════════════════════════════════════════════════
+let ctxAudio = null, analisadorMic = null, fluxoMic = null, dadosMic = null;
+function garantirAudio() {
+  if (!ctxAudio) ctxAudio = new (window.AudioContext || window.webkitAudioContext)();
+  if (ctxAudio.state === 'suspended') ctxAudio.resume();
+}
+async function abrirMic() {
+  if (fluxoMic) return fluxoMic;
+  fluxoMic = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true } });
+  garantirAudio();
+  const src = ctxAudio.createMediaStreamSource(fluxoMic);
+  analisadorMic = ctxAudio.createAnalyser(); analisadorMic.fftSize = 1024;
+  dadosMic = new Uint8Array(analisadorMic.fftSize);
+  src.connect(analisadorMic);
+  return fluxoMic;
+}
+function nivelMic() {
+  if (!analisadorMic) return 0;
+  analisadorMic.getByteTimeDomainData(dadosMic);
+  let s = 0; for (let i = 0; i < dadosMic.length; i++) { const v = (dadosMic[i] - 128) / 128; s += v * v; }
+  return Math.sqrt(s / dadosMic.length);
+}
+// volume do mic alimenta a esfera e a barra do HUD
+setInterval(() => {
+  const n = nivelMic();
+  $('barMic').style.width = Math.min(100, n * 500) + '%';
+  if (estado === 'ouvindo') nivelVoz = Math.min(1, n * 4) * .6 + falaInterim * .4;
+  falaInterim *= .85;
+}, 50);
+let falaInterim = 0;
+
+// ════════════════════════════════════════════════════════════════
+//  OUVIDO — 1) reconhecimento do navegador  2) Whisper no servidor
+// ════════════════════════════════════════════════════════════════
+const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+let modoOuvido = SR ? 'navegador' : 'servidor';
+let ativo = false, rec = null, recRodando = false;
+let errosSeguidos = 0;
+
+function atualizarHudOuvido() { $('hudOuvido').textContent = modoOuvido === 'navegador' ? 'NAVEGADOR' : 'WHISPER'; }
+atualizarHudOuvido();
+
+function criarRec() {
+  const r = new SR();
+  r.lang = 'pt-BR';
+  r.continuous = !celular;
+  r.interimResults = true;
+  r.maxAlternatives = 1;
+  r.onstart = () => { recRodando = true; };
+  r.onresult = (e) => {
+    let interim = '', final = '';
+    for (let i = e.resultIndex; i < e.results.length; i++) {
+      const tx = e.results[i][0].transcript;
+      if (e.results[i].isFinal) final += tx; else interim += tx;
+    }
+    errosSeguidos = 0;
+    if (interim) { legendaVoce(interim, true); falaInterim = .8; }
+    if (final.trim()) processar(final.trim(), true);
+  };
+  r.onerror = (e) => {
+    console.warn('reconhecimento:', e.error);
+    if (e.error === 'not-allowed') { legendaJarvis('Permita o uso do microfone no navegador (ícone de cadeado ao lado do endereço).', true); desligar(); }
+    else if (e.error === 'audio-capture') { legendaJarvis('Nenhum microfone encontrado. Verifique se ele está conectado.', true); desligar(); }
+    else if (e.error === 'network' || e.error === 'service-not-allowed' || e.error === 'language-not-supported') {
+      // navegador sem o serviço de voz (Brave, Opera, etc.) → usa Whisper do servidor
+      modoOuvido = 'servidor'; atualizarHudOuvido();
+      legendaVoce('trocando para o ouvido do servidor…');
+    } else if (e.error !== 'no-speech' && e.error !== 'aborted') {
+      errosSeguidos++;
+    }
+  };
+  r.onend = () => {
+    recRodando = false;
+    if (ativo && estado === 'ouvindo') {
+      if (modoOuvido === 'servidor') return ouvirServidor();
+      setTimeout(() => { if (ativo && estado === 'ouvindo' && !recRodando) iniciarRec(); }, errosSeguidos > 3 ? 1500 : 150);
+    }
+  };
+  return r;
+}
+function iniciarRec() {
+  if (!rec) rec = criarRec();
+  try { rec.start(); } catch {}
+}
+function pararRec() { if (rec) try { rec.abort(); } catch {} recRodando = false; }
+
+// ── Whisper: grava quando você fala, para quando fica em silêncio
+let gravador = null, laçoVAD = null;
+async function ouvirServidor() {
+  if (!saude.transcricao_servidor) {
+    legendaJarvis('Este navegador não tem reconhecimento de voz e o servidor está sem a chave GROQ_API_KEY. Use o Google Chrome ou o Edge, ou configure a chave.', true);
+    return;
+  }
+  try { await abrirMic(); } catch { legendaJarvis('Permita o uso do microfone no navegador.', true); return desligar(); }
+  pararVAD();
+  const tipos = ['audio/webm;codecs=opus', 'audio/webm', 'audio/mp4', 'audio/ogg;codecs=opus'];
+  const mime = tipos.find(t => window.MediaRecorder && MediaRecorder.isTypeSupported(t)) || '';
+  let piso = .01, gravando = false, inicio = 0, ultimaVoz = 0, pedacos = [];
+  laçoVAD = setInterval(() => {
+    if (!ativo || estado !== 'ouvindo') return pararVAD();
+    const n = nivelMic();
+    const limiar = Math.max(.025, piso * 2.8);
+    const agora = performance.now();
+    if (!gravando) {
+      piso = piso * .97 + n * .03;
+      if (n > limiar) {
+        pedacos = [];
+        gravador = new MediaRecorder(fluxoMic, mime ? { mimeType: mime } : undefined);
+        gravador.ondataavailable = e => e.data.size && pedacos.push(e.data);
+        gravador.onstop = () => enviarAudio(new Blob(pedacos, { type: gravador.mimeType || 'audio/webm' }), agora - inicio);
+        gravador.start(); gravando = true; inicio = ultimaVoz = agora;
+        legendaVoce('…', true);
+      }
+    } else {
+      if (n > limiar) ultimaVoz = agora;
+      if (agora - ultimaVoz > 1100 || agora - inicio > 15000) { gravando = false; try { gravador.stop(); } catch {} }
+    }
+  }, 50);
+}
+function pararVAD() { clearInterval(laçoVAD); laçoVAD = null; if (gravador && gravador.state === 'recording') { gravador.onstop = null; try { gravador.stop(); } catch {} } }
+
+async function enviarAudio(blob, duracao) {
+  if (duracao < 450 || blob.size < 2500) { legendaVoce(''); return; }
+  pararVAD();
+  mudarEstado('pensando', 'TRANSCREVENDO');
+  try {
+    const fd = new FormData(); fd.append('audio', blob, 'fala.' + (blob.type.includes('mp4') ? 'mp4' : 'webm'));
+    const r = await fetch('/api/transcribe', { method: 'POST', body: fd });
+    const d = await r.json();
+    if (!r.ok) throw new Error(d.mensagem || d.error);
+    const txt = (d.text || '').trim();
+    if (!txt || /^(obrigad[oa]|tchau|legendas pela comunidade.*)\.?$/i.test(txt)) { voltarAOuvir(); return; }
+    processar(txt, true);
+  } catch (e) {
+    legendaJarvis('Falha na transcrição: ' + e.message, true);
+    voltarAOuvir();
+  }
+}
+
+// ── liga / desliga
+function voltarAOuvir() {
+  if (!ativo) { mudarEstado('espera'); return; }
+  mudarEstado('ouvindo', sentinela && Date.now() > janelaConversa ? 'SENTINELA · DIGA JARVIS' : 'OUVINDO');
+  if (modoOuvido === 'navegador') iniciarRec(); else ouvirServidor();
+}
+async function ligar() {
+  garantirAudio();
+  ativo = true;
+  el.mic.classList.add('ligado');
+  el.mic.setAttribute('aria-label', 'Desligar microfone');
+  // no computador abrimos o mic também para a esfera reagir ao volume
+  if (!celular || modoOuvido === 'servidor') { try { await abrirMic(); } catch { legendaJarvis('Permita o uso do microfone no navegador.', true); return desligar(); } }
+  voltarAOuvir();
+}
+function desligar() {
+  ativo = false;
+  el.mic.classList.remove('ligado');
+  el.mic.setAttribute('aria-label', 'Ligar microfone');
+  pararRec(); pararVAD();
+  if (estado === 'ouvindo') mudarEstado('espera');
+}
+
+// ════════════════════════════════════════════════════════════════
+//  CÉREBRO
+// ════════════════════════════════════════════════════════════════
+let historico = [];
+try { historico = JSON.parse(localStorage.getItem('jarvis_hist') || '[]'); } catch {}
+let processando = false;
+
+// palavra de ativação (o reconhecimento às vezes escreve "Javis", "Jarbas"…)
+const RE_NOME = /\b(j[aá]r?v[ie]s|jarbas|jarvas|djarvis|jarvi)\b[\s,.!?:]*/i;
+let sentinela = false, janelaConversa = 0;
+try { sentinela = localStorage.getItem('jarvis_sentinela') === '1'; } catch {}
+
+async function processar(texto, deVoz) {
+  if (processando) return;
+  if (sentinela && deVoz) {
+    const chamou = RE_NOME.test(texto);
+    if (!chamou && Date.now() > janelaConversa) {
+      legendaVoce(texto, true);
+      if (modoOuvido === 'servidor') voltarAOuvir();
+      return;
+    }
+    texto = texto.replace(RE_NOME, ' ').replace(/^[\s,.!?]+/, '').trim();
+    if (!texto) {
+      processando = true; pararRec(); pararVAD();
+      await falar(`Pois não, ${saude.dono || 'senhor'}?`);
+      processando = false; janelaConversa = Date.now() + 12000;
+      voltarAOuvir();
+      return;
+    }
+  }
+  processando = true;
+  pararRec(); pararVAD();
+  legendaVoce(texto);
+  legendaJarvis('');
+  el.link.style.display = 'none';
+  mudarEstado('pensando');
+  try {
+    const r = await fetch('/api/chat', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ text: texto, history: historico })
+    });
+    const d = await r.json();
+    if (!r.ok) throw new Error(d.error || 'HTTP ' + r.status);
+    historico.push({ role: 'user', content: texto }, { role: 'assistant', content: d.fala });
+    historico = historico.slice(-16);
+    try { localStorage.setItem('jarvis_hist', JSON.stringify(historico)); } catch {}
+    if (d.cerebro) $('hudCerebro').textContent = d.cerebro.toUpperCase();
+    const acaoTela = d.acao && d.acao.tipo === 'tela';
+    if (d.acao && !acaoTela) executarAcao(d.acao);
+    await falar(d.fala, d.audio_url);
+    if (acaoTela) { if (!d.acao.pergunta) d.acao.pergunta = texto; await executarAcao(d.acao); }
+    janelaConversa = Date.now() + 12000;
+    if (d.erro === 'sem_chave') legendaJarvis('Configure a chave GROQ_API_KEY (grátis em console.groq.com) — veja o arquivo LEIA-ME.', true);
+    else if (d.erro === 'chave_invalida') legendaJarvis('A GROQ_API_KEY foi recusada. Gere uma nova em console.groq.com/keys e atualize no Render.', true);
+    else if (d.cerebro === 'erro' && d.detalhe) legendaJarvis('Detalhe técnico: ' + d.detalhe, true);
+  } catch (e) {
+    legendaJarvis('Sem conexão com o servidor do Jarvis. Tentando de novo em instantes.', true);
+    await new Promise(r => setTimeout(r, 1500));
+  }
+  processando = false;
+  voltarAOuvir();
+}
+
+// ════════════════════════════════════════════════════════════════
+//  AÇÕES — abrir sites e programas
+// ════════════════════════════════════════════════════════════════
+function urlDaAcao(a) {
+  if (a.tipo === 'abrir_site' && a.url) return /^https?:\/\//.test(a.url) ? a.url : 'https://' + a.url;
+  if (a.tipo === 'pesquisar' && a.termo) return 'https://www.google.com/search?q=' + encodeURIComponent(a.termo);
+  if (a.tipo === 'youtube' && a.termo) return 'https://www.youtube.com/results?search_query=' + encodeURIComponent(a.termo);
+  if (a.url) return a.url;
+  return null;
+}
+async function executarAcao(a) {
+  if (!a || typeof a !== 'object') return;
+  if (a.tipo === 'interface') return trocarModo(a.modo);
+  if (a.tipo === 'timer') return criarTimer(a.segundos, a.mensagem);
+  if (a.tipo === 'tela') {
+    if (a.sub === 'parar') return pararTela(true);
+    if (a.sub === 'vigiar') return vigiarTela();
+    return descreverTela(a.pergunta || '');
+  }
+  const url = urlDaAcao(a);
+  if (saude.comandos_pc) {
+    try {
+      const r = await (await fetch('/api/pc/acao', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(url ? { url } : a) })).json();
+      if (r.ok) return;
+    } catch {}
+  }
+  if (url) {
+    const w = window.open(url, '_blank', 'noopener');
+    if (!w) { el.linkA.href = url; el.linkA.textContent = 'TOQUE PARA ABRIR ↗'; el.link.style.display = 'block'; }
+  } else if (a.tipo === 'abrir_app' || a.tipo === 'sistema') {
+    legendaVoce('isso só funciona com o Jarvis rodando no seu computador');
+  }
+}
+
+// ════════════════════════════════════════════════════════════════
+//  VOZ — Piper (Faber) → voz do navegador
+// ════════════════════════════════════════════════════════════════
+let mudo = false;
+try { mudo = localStorage.getItem('jarvis_mudo') === '1'; } catch {}
+let audioAtual = null;
+
+// legenda palavra por palavra (blocos de até 7 palavras, como nos vídeos)
+function digitar(texto, ms) {
+  const ini = performance.now();
+  const palavras = texto.split(/\s+/).filter(Boolean);
+  const BLOCO = celular ? 5 : 7;
+  const esc = w => w.replace(/[&<>]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' }[c]));
+  let ultimoIdx = -1;
+  el.jarvis.classList.add('karaoke');
+  return setInterval(() => {
+    const k = Math.min(1, (performance.now() - ini) / Math.max(400, ms));
+    const idx = Math.min(palavras.length - 1, Math.floor(k * palavras.length));
+    if (idx === ultimoIdx) return;
+    ultimoIdx = idx;
+    const ini2 = Math.floor(idx / BLOCO) * BLOCO;
+    el.jarvis.innerHTML = palavras.slice(ini2, ini2 + BLOCO)
+      .map((w, i) => `<span class="w${ini2 + i <= idx ? ' dita' : ''}">${esc(w)}</span>`).join(' ');
+  }, 40);
+}
+
+async function falar(texto, audioUrl) {
+  if (!texto) return;
+  legendaJarvis('', false);
+  if (mudo) { legendaJarvis(texto); return; }
+  mudarEstado('falando');
+  try {
+    let url = audioUrl, local = false;
+    if (!url && saude.voz_motor && saude.voz_motor !== 'navegador') {
+      const r = await fetch('/api/tts', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ text: texto }) });
+      if (!r.ok) throw new Error('tts');
+      url = URL.createObjectURL(await r.blob()); local = true;
+    }
+    if (!url) throw new Error('sem voz');
+    await tocar(url, texto, local);
+  } catch {
+    await vozNavegador(texto);
+  }
+  nivelVoz = 0;
+  legendaJarvis(texto);
+}
+
+function tocar(url, texto, analisar) {
+  return new Promise((ok, falha) => {
+    const au = new Audio(url);
+    audioAtual = au;
+    let timer = null, laço = null;
+    au.onloadedmetadata = () => { timer = digitar(texto, au.duration * 1000 * .9); };
+    if (analisar && ctxAudio) {
+      try {
+        const src = ctxAudio.createMediaElementSource(au);
+        const an = ctxAudio.createAnalyser(); an.fftSize = 512;
+        const buf = new Uint8Array(an.fftSize);
+        src.connect(an); an.connect(ctxAudio.destination);
+        laço = setInterval(() => {
+          an.getByteTimeDomainData(buf);
+          let s = 0; for (let i = 0; i < buf.length; i++) { const v = (buf[i] - 128) / 128; s += v * v; }
+          nivelVoz = Math.min(1, Math.sqrt(s / buf.length) * 5);
+        }, 33);
+      } catch {}
+    } else {
+      laço = setInterval(() => { nivelVoz = .3 + Math.random() * .5; }, 90);
+    }
+    const fim = (erro) => { clearInterval(timer); clearInterval(laço); nivelVoz = 0; audioAtual = null; erro ? falha(erro) : ok(); };
+    au.onended = () => fim();
+    au.onerror = () => fim(new Error('audio'));
+    au.play().catch(fim);
+  });
+}
+
+function vozNavegador(texto) {
+  return new Promise(ok => {
+    if (!('speechSynthesis' in window)) return ok();
+    const u = new SpeechSynthesisUtterance(texto);
+    u.lang = 'pt-BR'; u.rate = 1.05; u.pitch = .9;
+    const vozes = speechSynthesis.getVoices().filter(v => v.lang.replace('_', '-').toLowerCase().startsWith('pt-br'));
+    u.voice = vozes.find(v => /daniel|antonio|male|masculin/i.test(v.name)) || vozes.find(v => /google/i.test(v.name)) || vozes[0] || null;
+    const timer = digitar(texto, texto.length * 65);
+    const laço = setInterval(() => { nivelVoz = .25 + Math.random() * .55; }, 90);
+    const fim = () => { clearInterval(timer); clearInterval(laço); nivelVoz = 0; ok(); };
+    u.onend = fim; u.onerror = fim;
+    speechSynthesis.cancel();
+    speechSynthesis.speak(u);
+    setTimeout(fim, 4000 + texto.length * 120); // segurança
+  });
+}
+if ('speechSynthesis' in window) speechSynthesis.onvoiceschanged = () => {};
+
+// ════════════════════════════════════════════════════════════════
+//  CONTROLES
+// ════════════════════════════════════════════════════════════════
+function atualizarMudo() {
+  el.mudo.classList.toggle('ativo', mudo);
+  document.getElementById('ondas').style.display = mudo ? 'none' : '';
+  $('hudVoz').textContent = mudo ? 'MUDO' : ({ eleven: 'PREMIUM', faber: 'FABER' }[saude.voz_motor] || 'NAVEGADOR');
+}
+atualizarMudo();
+
+el.mic.onclick = () => {
+  if (audioAtual) { audioAtual.pause(); audioAtual.onended?.(); }
+  ativo ? desligar() : ligar();
+};
+el.mudo.onclick = () => {
+  mudo = !mudo;
+  try { localStorage.setItem('jarvis_mudo', mudo ? '1' : '0'); } catch {}
+  if (mudo && audioAtual) { audioAtual.pause(); audioAtual.onended?.(); }
+  if (mudo) speechSynthesis?.cancel();
+  atualizarMudo();
+};
+el.teclado.onclick = () => {
+  const abrir = !el.form.classList.contains('aberto');
+  el.form.classList.toggle('aberto', abrir);
+  el.teclado.classList.toggle('ativo', abrir);
+  document.body.classList.toggle('digitando', abrir);
+  if (abrir) el.campo.focus();
+};
+el.form.onsubmit = (e) => {
+  e.preventDefault();
+  const t = el.campo.value.trim();
+  if (!t) return;
+  garantirAudio();
+  el.campo.value = '';
+  if (audioAtual) { audioAtual.pause(); audioAtual.onended?.(); }
+  processar(t);
+};
+addEventListener('keydown', (e) => {
+  if (e.target === el.campo) { if (e.key === 'Escape') el.teclado.click(); return; }
+  if (e.code === 'Space') { e.preventDefault(); el.mic.click(); }
+  if (e.key === 't' || e.key === 'T') { e.preventDefault(); el.teclado.click(); }
+  if (e.key === 'm' || e.key === 'M') el.mudo.click();
+  if (e.key === 'i' || e.key === 'I') { if (Visual.atual() === 'camera') trocarModo(modoRostoAnterior); else trocarModo(); }
+  if (e.key === 'c' || e.key === 'C') alternarCamera();
+  if (e.key === 'v' || e.key === 'V') alternarTela();
+  if (e.key === 's' || e.key === 'S') alternarSentinela();
+});
+
+// ── trocar interface (botão, tecla I ou por voz)
+const NOMES_MODO = { nucleo: 'NÚCLEO', esfera: 'ESFERA', holograma: 'HOLOGRAMA', tempestade: 'TEMPESTADE', camera: 'VISÃO' };
+let modoRostoAnterior = Visual.modos.includes(modoSalvo) ? modoSalvo : 'holograma';
+function trocarModo(nome) {
+  const lista = Visual.modos;
+  if (!nome || (!lista.includes(nome) && nome !== 'camera')) nome = lista[(lista.indexOf(Visual.atual()) + 1) % lista.length];
+  if (lista.includes(nome)) modoRostoAnterior = nome;
+  Visual.modo(nome);
+  try { if (nome !== 'camera') localStorage.setItem('jarvis_modo', nome); } catch {}
+  document.querySelector('meta[name=theme-color]').content = { nucleo: '#02060d', esfera: '#081226', holograma: '#02050b', tempestade: '#0b0216', camera: '#04070e' }[nome];
+  $('btnCamera').classList.toggle('ativo', nome === 'camera');
+  if (estado !== 'falando') legendaVoce('interface: ' + NOMES_MODO[nome]);
+}
+$('btnModo').onclick = () => { if (Visual.atual() === 'camera') trocarModo(modoRostoAnterior); else trocarModo(); };
+function alternarCamera() { trocarModo(Visual.atual() === 'camera' ? modoRostoAnterior : 'camera'); }
+$('btnCamera').onclick = alternarCamera;
+
+// tela inicial: o toque libera microfone e áudio (exigência dos navegadores)
+el.inicio.onclick = async () => {
+  el.inicio.classList.add('some');
+  Visual.modo(Visual.atual()); // reapresenta a montagem
+  garantirAudio();
+  await lerSaude();
+  const h = new Date().getHours();
+  const saud = h < 5 ? 'Boa noite' : h < 12 ? 'Bom dia' : h < 18 ? 'Boa tarde' : 'Boa noite';
+  const dono = saude.dono || 'senhor';
+  somInicio();
+  const p = await lerPainel();
+  const c = p?.clima;
+  const extra = c ? ` Em ${c.cidade.split(',')[0]}, ${c.agora.temperatura} graus e ${c.agora.condicao}.` : '';
+  await falar(`${saud}, ${dono}. Todos os sistemas estão online.${extra} Em que posso ajudar?`);
+  ligar();
+};
+// ════════════════════════════════════════════════════════════════
+//  PAINEL — clima e cotações em tempo real
+// ════════════════════════════════════════════════════════════════
+async function lerPainel() {
+  try {
+    const p = await (await fetch('/api/painel', { cache: 'no-store' })).json();
+    if (p.clima) $('hudClima').textContent = `${p.clima.cidade.split(',')[0]} ${p.clima.agora.temperatura}° · ${p.clima.agora.condicao}`;
+    if (p.cotacao) {
+      const f = (c, k, casas) => { const q = p.cotacao[c]; if (!q) return ''; const s = q.variacao_pct >= 0 ? '▲' : '▼'; return `${k} ${q.valor_reais.toLocaleString('pt-BR', { maximumFractionDigits: casas })} ${s}${Math.abs(q.variacao_pct).toLocaleString('pt-BR', { minimumFractionDigits: 1, maximumFractionDigits: 1 })}%`; };
+      $('hudCot').textContent = [f('USD', 'USD', 2), f('BTC', 'BTC', 0)].filter(Boolean).join('  ·  ');
+    }
+    return p;
+  } catch { return null; }
+}
+lerPainel(); setInterval(lerPainel, 600000);
+
+// ════════════════════════════════════════════════════════════════
+//  TIMERS E LEMBRETES
+// ════════════════════════════════════════════════════════════════
+let timers = [];
+try { timers = JSON.parse(localStorage.getItem('jarvis_timers') || '[]').filter(t => t.fim > Date.now() - 60000); } catch {}
+const salvarTimers = () => { try { localStorage.setItem('jarvis_timers', JSON.stringify(timers)); } catch {} };
+function criarTimer(segundos, mensagem) {
+  segundos = Math.max(1, Math.min(86400 * 7, Number(segundos) || 60));
+  timers.push({ fim: Date.now() + segundos * 1000, msg: String(mensagem || '').slice(0, 120) });
+  salvarTimers(); mostrarTimers();
+}
+function fmtTempo(ms) {
+  const s = Math.max(0, Math.ceil(ms / 1000)), h = Math.floor(s / 3600), m = Math.floor(s % 3600 / 60), ss = s % 60;
+  return (h ? h + ':' + String(m).padStart(2, '0') : m) + ':' + String(ss).padStart(2, '0');
+}
+function mostrarTimers() {
+  $('hudTimers').innerHTML = timers.map(t => `<div>⏱ ${fmtTempo(t.fim - Date.now())}${t.msg ? ' · ' + t.msg.replace(/[<>&]/g, '') : ''}</div>`).join('');
+}
+function bipe(vezes = 3) {
+  garantirAudio();
+  for (let i = 0; i < vezes; i++) {
+    const o = ctxAudio.createOscillator(), gn = ctxAudio.createGain(), t0 = ctxAudio.currentTime + i * .32;
+    o.type = 'sine'; o.frequency.setValueAtTime(880, t0); o.frequency.setValueAtTime(1320, t0 + .1);
+    gn.gain.setValueAtTime(0, t0); gn.gain.linearRampToValueAtTime(.18, t0 + .02); gn.gain.exponentialRampToValueAtTime(.001, t0 + .25);
+    o.connect(gn); gn.connect(ctxAudio.destination); o.start(t0); o.stop(t0 + .3);
+  }
+}
+let alarmeTocando = false;
+async function dispararTimer(t) {
+  alarmeTocando = true;
+  while (processando) await new Promise(r => setTimeout(r, 300));
+  processando = true; pararRec(); pararVAD();
+  bipe(3);
+  await new Promise(r => setTimeout(r, 1000));
+  const dono = (saude.dono || 'senhor').replace(/^./, c => c.toUpperCase());
+  await falar(`${dono}, ${t.msg ? 'lembrete: ' + t.msg : 'o seu timer terminou'}.`);
+  processando = false; alarmeTocando = false;
+  janelaConversa = Date.now() + 12000;
+  voltarAOuvir();
+}
+setInterval(() => {
+  const agora = Date.now();
+  const vencidos = timers.filter(t => t.fim <= agora);
+  if (vencidos.length) { timers = timers.filter(t => t.fim > agora); salvarTimers(); vencidos.forEach(dispararTimer); }
+  mostrarTimers();
+}, 1000);
+mostrarTimers();
+
+// ════════════════════════════════════════════════════════════════
+//  MODO SENTINELA — escuta sempre, responde quando chamado
+// ════════════════════════════════════════════════════════════════
+function alternarSentinela() {
+  sentinela = !sentinela;
+  try { localStorage.setItem('jarvis_sentinela', sentinela ? '1' : '0'); } catch {}
+  $('btnSentinela').classList.toggle('ativo', sentinela);
+  legendaVoce(sentinela ? 'sentinela ligado: diga "Jarvis" antes do pedido' : 'sentinela desligado: respondo tudo o que ouvir');
+  if (sentinela && !ativo) ligar();
+  else if (ativo && estado === 'ouvindo') mudarEstado('ouvindo', sentinela ? 'SENTINELA · DIGA JARVIS' : 'OUVINDO');
+}
+$('btnSentinela').classList.toggle('ativo', sentinela);
+$('btnSentinela').onclick = alternarSentinela;
+
+// som de inicialização (sintetizado, sem arquivos)
+function somInicio() {
+  try {
+    garantirAudio();
+    const t0 = ctxAudio.currentTime;
+    const o = ctxAudio.createOscillator(), o2 = ctxAudio.createOscillator(), gn = ctxAudio.createGain(), filtro = ctxAudio.createBiquadFilter();
+    o.type = 'sawtooth'; o2.type = 'sine';
+    o.frequency.setValueAtTime(70, t0); o.frequency.exponentialRampToValueAtTime(420, t0 + 1.4);
+    o2.frequency.setValueAtTime(140, t0); o2.frequency.exponentialRampToValueAtTime(1100, t0 + 1.4);
+    filtro.type = 'lowpass'; filtro.frequency.setValueAtTime(300, t0); filtro.frequency.exponentialRampToValueAtTime(3000, t0 + 1.4);
+    gn.gain.setValueAtTime(0, t0); gn.gain.linearRampToValueAtTime(.09, t0 + .5); gn.gain.exponentialRampToValueAtTime(.001, t0 + 1.9);
+    o.connect(filtro); o2.connect(filtro); filtro.connect(gn); gn.connect(ctxAudio.destination);
+    o.start(t0); o2.start(t0); o.stop(t0 + 2); o2.stop(t0 + 2);
+    const sino = ctxAudio.createOscillator(), gs = ctxAudio.createGain();
+    sino.frequency.value = 1760; gs.gain.setValueAtTime(0, t0 + 1.4); gs.gain.linearRampToValueAtTime(.08, t0 + 1.42); gs.gain.exponentialRampToValueAtTime(.001, t0 + 2.4);
+    sino.connect(gs); gs.connect(ctxAudio.destination); sino.start(t0 + 1.4); sino.stop(t0 + 2.5);
+  } catch {}
+}
+
+// ════════════════════════════════════════════════════════════════
+//  APP DE CELULAR (PWA) — instalação e service worker
+// ════════════════════════════════════════════════════════════════
+if ('serviceWorker' in navigator) {
+  addEventListener('load', () => navigator.serviceWorker.register('sw.js').catch(() => {}));
+}
+let promptInstalar = null;
+addEventListener('beforeinstallprompt', (e) => {
+  e.preventDefault(); promptInstalar = e;
+  if (!matchMedia('(display-mode: standalone)').matches) $('btnInstalar').classList.add('mostra');
+});
+$('btnInstalar').onclick = async () => {
+  if (!promptInstalar) return;
+  $('btnInstalar').classList.remove('mostra');
+  promptInstalar.prompt();
+  await promptInstalar.userChoice.catch(() => {});
+  promptInstalar = null;
+};
+addEventListener('appinstalled', () => $('btnInstalar').classList.remove('mostra'));
+// iPhone/Safari não dispara o evento: mostra dica de "Compartilhar → Tela de Início"
+if (/iPhone|iPad|iPod/.test(navigator.userAgent) && !navigator.standalone && !matchMedia('(display-mode: standalone)').matches) {
+  const b = $('btnInstalar'); b.textContent = '⬇ INSTALAR: COMPARTILHAR → TELA DE INÍCIO'; b.classList.add('mostra');
+  b.onclick = () => b.classList.remove('mostra');
+}
+
+// ════════════════════════════════════════════════════════════════
+//  VISÃO DE TELA — ele vê e descreve o que está na sua tela
+//  (você escolhe o que compartilhar; funciona no computador)
+// ════════════════════════════════════════════════════════════════
+let telaStream = null, telaVideo = null, vigiaTela = null, ultimaDescTela = '';
+const temCapturaTela = !!(navigator.mediaDevices && navigator.mediaDevices.getDisplayMedia);
+
+function hudTela(txt) { $('hudTela').innerHTML = txt ? `<div class="fim">👁 ${txt}</div>` : ''; }
+
+async function iniciarTela() {
+  if (telaStream) return true;
+  if (!temCapturaTela) {
+    await falar(`${saude.dono || 'Senhor'}, ver a tela só funciona no computador. No celular eu uso a câmera, pelo botão de visão.`);
+    return false;
+  }
+  try {
+    telaStream = await navigator.mediaDevices.getDisplayMedia({ video: { frameRate: 1 }, audio: false });
+    telaVideo = document.createElement('video');
+    telaVideo.setAttribute('playsinline', ''); telaVideo.muted = true;
+    telaVideo.srcObject = telaStream; await telaVideo.play().catch(() => {});
+    telaStream.getVideoTracks()[0].addEventListener('ended', () => pararTela(false));
+    $('btnTela').classList.add('ativo');
+    return true;
+  } catch (e) {
+    telaStream = null;
+    if (e.name !== 'NotAllowedError') await falar('Não consegui acessar a tela, senhor.');
+    return false;
+  }
+}
+function pararTela(avisar) {
+  if (vigiaTela) { clearInterval(vigiaTela); vigiaTela = null; }
+  if (telaStream) { telaStream.getTracks().forEach(t => t.stop()); telaStream = null; }
+  telaVideo = null; ultimaDescTela = '';
+  $('btnTela').classList.remove('ativo'); hudTela('');
+  if (avisar) legendaVoce('parei de ver a sua tela');
+}
+function capturarTela() {
+  if (!telaVideo || !telaVideo.videoWidth) return null;
+  const maxL = 1280, esc = Math.min(1, maxL / telaVideo.videoWidth);
+  const cv = document.createElement('canvas');
+  cv.width = Math.round(telaVideo.videoWidth * esc); cv.height = Math.round(telaVideo.videoHeight * esc);
+  cv.getContext('2d').drawImage(telaVideo, 0, 0, cv.width, cv.height);
+  return cv.toDataURL('image/jpeg', 0.55);
+}
+async function pedirDescricao(pergunta, continuo) {
+  const imagem = capturarTela();
+  if (!imagem) return null;
+  try {
+    const r = await fetch('/api/visao', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ imagem, pergunta, continuo }) });
+    const d = await r.json();
+    if (!r.ok) throw new Error(d.mensagem || d.error);
+    return (d.descricao || '').trim();
+  } catch (e) {
+    return '__erro__' + e.message;
+  }
+}
+async function descreverTela(pergunta) {
+  if (!saude.visao_tela) { await falar('Preciso da chave do Groq configurada para enxergar a tela, senhor.'); return; }
+  const ok = await iniciarTela();
+  if (!ok) return;
+  mudarEstado('pensando', 'ANALISANDO TELA');
+  const desc = await pedirDescricao(pergunta || '', false);
+  if (desc && desc.startsWith('__erro__')) { legendaJarvis('Não consegui analisar a tela: ' + desc.slice(8), true); voltarAOuvir(); return; }
+  if (desc) { ultimaDescTela = desc; await falar(desc); } else voltarAOuvir();
+}
+async function vigiarTela() {
+  if (!saude.visao_tela) { await falar('Preciso da chave do Groq configurada para enxergar a tela, senhor.'); return; }
+  const ok = await iniciarTela();
+  if (!ok) return;
+  hudTela('acompanhando sua tela');
+  if (vigiaTela) clearInterval(vigiaTela);
+  const tick = async () => {
+    if (!telaStream || processando || alarmeTocando) return;
+    const desc = await pedirDescricao('', true);
+    if (!desc || desc.startsWith('__erro__')) return;
+    // só fala se mudou de verdade
+    const a = desc.toLowerCase().slice(0, 45), b = ultimaDescTela.toLowerCase().slice(0, 45);
+    if (a === b) return;
+    ultimaDescTela = desc;
+    if (!processando && !alarmeTocando) { processando = true; pararRec(); pararVAD(); await falar(desc); processando = false; voltarAOuvir(); }
+  };
+  await tick();
+  vigiaTela = setInterval(tick, 12000);
+}
+async function alternarTela() {
+  if (telaStream) pararTela(true);
+  else { garantirAudio(); await descreverTela(''); }
+}
+$('btnTela').onclick = alternarTela;
+$('btnCasa').onclick = () => { location.href = 'casa.html'; };
+
+mudarEstado('espera');
+</script>
+</body>
+</html>
+
+
+
+######################################################################
+### ARQUIVO: public/visuais.js
+######################################################################
+
+// ════════════════════════════════════════════════════════════════
+//  J.A.R.V.I.S. — VISUAIS
+//  3 interfaces que reagem à voz:
+//   • esfera    — rede neural 3D de pontos
+//   • holograma — busto de linhas ciano, rosto laranja, montanhas
+//   • tempestade — busto masculino neon roxo, fumaça e raios
+// ════════════════════════════════════════════════════════════════
+'use strict';
+(() => {
+const celular = /Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent);
+let tela, g, L = 0, A = 0, DPR = 1, lerNivel = () => 0;
+let modo = null, nomeModo = '', ultimo = performance.now(), tempo = 0;
+
+const P = { energia: .25, deform: .05, giro: .12, brilho: .55, nivel: 0, escala: 1, estado: 'espera' };
+const alvo = { energia: .25, deform: .05, giro: .12, brilho: .55, escala: 1 };
+const TABELA = {
+  espera:   { energia: .2,  deform: .04, giro: .08, brilho: .4,  escala: .96 },
+  ouvindo:  { energia: .45, deform: .07, giro: .14, brilho: .75, escala: 1 },
+  pensando: { energia: 1.4, deform: .16, giro: .55, brilho: .9,  escala: .92 },
+  falando:  { energia: .8,  deform: .09, giro: .2,  brilho: 1,   escala: 1.04 }
+};
+
+const rnd = (a = 0, b = 1) => a + Math.random() * (b - a);
+const lim = (x, a = 0, b = 1) => Math.max(a, Math.min(b, x));
+const suave = x => { x = lim(x); return x * x * (3 - 2 * x); };
+const cubica = (p0, p1, p2, p3, t) => {
+  const m = 1 - t;
+  return [m*m*m*p0[0] + 3*m*m*t*p1[0] + 3*m*t*t*p2[0] + t*t*t*p3[0], m*m*m*p0[1] + 3*m*m*t*p1[1] + 3*m*t*t*p2[1] + t*t*t*p3[1]];
+};
+const curva = (p0, p1, p2, p3, n = 24) => Array.from({ length: n + 1 }, (_, i) => cubica(p0, p1, p2, p3, i / n));
+
+function novaCamada() {
+  const c = document.createElement('canvas');
+  c.width = Math.max(1, L * DPR); c.height = Math.max(1, A * DPR);
+  const cg = c.getContext('2d');
+  cg.setTransform(DPR, 0, 0, DPR, 0, 0);
+  return [c, cg];
+}
+
+function textoStatus() {
+  const e = { espera: 'STANDBY', ouvindo: 'OUVINDO', pensando: 'PROCESSANDO', falando: 'FALANDO' }[P.estado] || 'STANDBY';
+  const n = P.nivel < .2 ? 'BAIXA' : P.nivel < .5 ? 'MÉDIA' : 'ALTA';
+  return `STATUS: ${e}   INTENSIDADE: ${n}`;
+}
+
+// ════════════════════════════════════════════════════════════════
+//  MODO 1 — ESFERA NEURAL
+// ════════════════════════════════════════════════════════════════
+const esfera = (() => {
+  const N = celular ? 300 : 460;
+  const pts = [], pares = [];
+  const ouro = Math.PI * (3 - Math.sqrt(5));
+  for (let i = 0; i < N; i++) {
+    const y = 1 - (i / (N - 1)) * 2, r = Math.sqrt(1 - y * y);
+    const th = ouro * i + (Math.random() - .5) * .35;
+    let x = Math.cos(th) * r, z = Math.sin(th) * r, yy = y + (Math.random() - .5) * .05;
+    const n = Math.hypot(x, yy, z); x /= n; yy /= n; z /= n;
+    pts.push({ x, y: yy, z, raio: .92 + Math.random() * .14, f1: rnd(0, 6.28), f2: rnd(0, 6.28), f3: rnd(0, 6.28),
+      tam: Math.random() < .12 ? 2.4 + Math.random() * 1.4 : 1 + Math.random() * 1.2,
+      espinho: Math.random() < .035 ? .6 + Math.random() * .9 : 0,
+      sx: rnd(-3, 3), sy: rnd(-3, 3), sz: rnd(-3, 3), px: 0, py: 0, pz: 0, ps: 0 });
+  }
+  const visto = new Set(), K = celular ? 3 : 4;
+  for (let i = 0; i < N; i++) {
+    const d = [];
+    for (let j = 0; j < N; j++) if (i !== j) d.push([(pts[i].x - pts[j].x) ** 2 + (pts[i].y - pts[j].y) ** 2 + (pts[i].z - pts[j].z) ** 2, j]);
+    d.sort((p, q) => p[0] - q[0]);
+    for (let k = 0; k < K; k++) { const j = d[k][1], ch = i < j ? i + '-' + j : j + '-' + i; if (!visto.has(ch)) { visto.add(ch); pares.push([i, j]); } }
+  }
+  for (let k = 0; k < N * .08; k++) pares.push([Math.random() * N | 0, Math.random() * N | 0]);
+  const poeira = Array.from({ length: celular ? 40 : 90 }, () => ({ x: Math.random(), y: Math.random(), v: rnd(.002, .008), a: Math.random() * .35 }));
+  let t0 = 0, interno = 0, angY = 0;
+
+  return {
+    entrar() { t0 = tempo; },
+    redim() {},
+    desenhar(dt) {
+      const mont = 1 - Math.pow(1 - lim((tempo - t0) / 2.6), 3);
+      interno += dt * (0.8 + P.energia * 1.6);
+      angY += dt * (P.giro + P.nivel * .35);
+      const t = interno, angX = .32 + Math.sin(t * .13) * .18;
+      const cy = Math.cos(angY), sy = Math.sin(angY), cx = Math.cos(angX), sx = Math.sin(angX);
+      const bg = g.createRadialGradient(L / 2, A * .45, 0, L / 2, A * .45, Math.max(L, A) * .75);
+      bg.addColorStop(0, '#10224a'); bg.addColorStop(.45, '#081226'); bg.addColorStop(1, '#040913');
+      g.fillStyle = bg; g.fillRect(0, 0, L, A);
+      g.fillStyle = '#7db8ff';
+      for (const p of poeira) {
+        p.y -= p.v * dt * 6; if (p.y < 0) { p.y = 1; p.x = Math.random(); }
+        g.globalAlpha = p.a * (.5 + P.brilho * .5); g.fillRect(p.x * L, p.y * A, 1.2, 1.2);
+      }
+      const R = Math.min(L * .42, A * .25) * P.escala * (1 + P.nivel * .1);
+      const CX = L / 2, CY = A * (L < 640 ? .4 : .42), foco = R * 3.2;
+      const gr = g.createRadialGradient(CX, CY, 0, CX, CY, R * 1.6);
+      gr.addColorStop(0, `rgba(77,155,255,${.08 + P.brilho * .1 + P.nivel * .18})`); gr.addColorStop(1, 'rgba(77,155,255,0)');
+      g.globalAlpha = 1; g.fillStyle = gr; g.fillRect(CX - R * 2, CY - R * 2, R * 4, R * 4);
+      const def = P.deform + P.nivel * .32, achata = 1 + Math.sin(t * .37) * .07 * (1 + P.energia);
+      for (const p of pts) {
+        const onda = Math.sin(p.x * 3.1 + t * .9 + p.f1) * .5 + Math.sin(p.y * 4.3 - t * 1.25 + p.f2) * .32 + Math.sin(p.z * 5.6 + t * 1.7 + p.f3) * .18;
+        const r = p.raio + onda * def + p.espinho * P.nivel * (.6 + .4 * Math.sin(t * 6 + p.f1));
+        let x = p.x * r, y = p.y * r / achata, z = p.z * r * achata;
+        if (mont < 1) { x = p.sx + (x - p.sx) * mont; y = p.sy + (y - p.sy) * mont; z = p.sz + (z - p.sz) * mont; }
+        const x1 = x * cy - z * sy, z1 = x * sy + z * cy, y2 = y * cx - z1 * sx, z2 = y * sx + z1 * cx;
+        const esc = foco / (foco + z2 * R);
+        p.px = CX + x1 * R * esc; p.py = CY + y2 * R * esc; p.pz = z2; p.ps = esc;
+      }
+      g.lineWidth = .7; g.strokeStyle = '#6aaaff';
+      const grupos = [[], [], [], []];
+      for (const [i, j] of pares) { const a = pts[i], b = pts[j]; grupos[Math.max(0, Math.min(3, (((a.pz + b.pz) / 2 + 1.3) / 2.6 * 4) | 0))].push(a, b); }
+      const al = (.1 + P.brilho * .22 + P.nivel * .25) * mont;
+      grupos.forEach((lista, gi) => {
+        g.globalAlpha = al * (1 - gi * .22); g.beginPath();
+        for (let k = 0; k < lista.length; k += 2) { g.moveTo(lista[k].px, lista[k].py); g.lineTo(lista[k + 1].px, lista[k + 1].py); }
+        g.stroke();
+      });
+      g.globalCompositeOperation = 'lighter';
+      for (const p of pts) {
+        const a = (.25 + (1 - (p.pz + 1.2) / 2.4) * .75) * (.55 + P.brilho * .45), s = p.tam * p.ps * (1 + P.nivel * .5);
+        g.globalAlpha = Math.max(.05, a); g.fillStyle = p.tam > 2.3 ? '#d4e8ff' : '#8fc3ff';
+        g.fillRect(p.px - s / 2, p.py - s / 2, s, s);
+        if (p.tam > 2.3) { g.globalAlpha = a * .18; g.fillRect(p.px - s * 1.6, p.py - s * 1.6, s * 3.2, s * 3.2); }
+      }
+      g.globalCompositeOperation = 'source-over'; g.globalAlpha = 1;
+    }
+  };
+})();
+
+// ════════════════════════════════════════════════════════════════
+//  BUSTO — geometria compartilhada (coordenadas normalizadas:
+//  u = horizontal a partir do centro, v = vertical a partir do topo)
+// ════════════════════════════════════════════════════════════════
+function criarBusto(fem) {
+  const kL = fem ? .84 : 1, queixo = fem ? .56 : .575, vc = fem ? .25 : .26;
+  const cabeca = v => {
+    if (v < 0 || v > queixo) return 0;
+    let w;
+    if (v <= vc) { const t = (v - vc) / vc; w = .2 * Math.sqrt(Math.max(0, 1 - t * t)); }
+    else { const t = (v - vc) / (queixo - vc); w = .2 * Math.sqrt(Math.max(0, 1 - t * t)) * (1 - (fem ? .3 : .22) * t); }
+    if (!fem) w += .016 * Math.exp(-(((v - .3) / .035) ** 2));
+    return w * kL;
+  };
+  // ombros (curvas de Bézier amostradas)
+  const seg = fem
+    ? [[[.085, .62], [.09, .75], [.32, .73], [.45, .83]], [[.45, .83], [.53, .89], [.53, 1.0], [.52, 1.6]]]
+    : [[[.112, .62], [.118, .745], [.40, .75], [.58, .86]], [[.58, .86], [.70, .93], [.74, 1.0], [.77, 1.6]]];
+  const tab = [];
+  seg.forEach(s => { for (let i = 0; i <= 80; i++) tab.push(cubica(...s, i / 80)); });
+  tab.sort((a, b) => a[1] - b[1]);
+  const pescocoTopo = .47, pesc0 = fem ? .078 : .105;
+  const corpo = v => {
+    if (v < pescocoTopo) return 0;
+    if (v < seg[0][0][1]) return pesc0 + (seg[0][0][0] - pesc0) * (v - pescocoTopo) / (seg[0][0][1] - pescocoTopo);
+    if (v >= tab[tab.length - 1][1]) return tab[tab.length - 1][0];
+    let i = 1; while (tab[i][1] < v) i++;
+    const a = tab[i - 1], b = tab[i], k = (v - a[1]) / Math.max(1e-6, b[1] - a[1]);
+    return a[0] + (b[0] - a[0]) * k;
+  };
+  const dentroCorpo = (u, v) => v > pescocoTopo + .02 && Math.abs(u) < corpo(v) - .004;
+  return { cabeca, corpo, dentroCorpo, queixo, vc, pescocoTopo, fem };
+}
+
+// Base dos modos holográficos: layout, partículas de montagem, conversão de coordenadas
+function baseHolo(fem) {
+  const B = criarBusto(fem);
+  const H = { B, S: 1, cx: 0, topo: 0, vMax: 1.6, linhas: [], amostras: [], estatico: null, t0: 0 };
+  H.X = u => H.cx + u * H.S;
+  H.Y = v => H.topo + v * H.S;
+  H.layout = () => {
+    if (L < 640) { H.S = Math.min(A * .6, L * 1.05); H.topo = A * .17; }
+    else { H.S = Math.min(A * .8, L * .9); H.topo = A * .09; }
+    H.cx = L / 2;
+    H.vMax = (A - H.topo) / H.S + .05;
+  };
+  H.caminhoCabeca = (cg) => {
+    cg.beginPath();
+    for (let v = 0; v <= B.queixo; v += .005) cg.lineTo(H.X(B.cabeca(v)), H.Y(v));
+    for (let v = B.queixo; v >= 0; v -= .005) cg.lineTo(H.X(-B.cabeca(v)), H.Y(v));
+    cg.closePath();
+  };
+  H.caminhoCorpo = (cg) => {
+    cg.beginPath();
+    for (let v = B.pescocoTopo; v <= H.vMax; v += .005) cg.lineTo(H.X(-B.corpo(v)), H.Y(v));
+    for (let v = H.vMax; v >= B.pescocoTopo; v -= .005) cg.lineTo(H.X(B.corpo(v)), H.Y(v));
+    cg.closePath();
+  };
+  H.contornoCorpo = (lado) => { const pts = []; for (let v = B.pescocoTopo + .04; v <= H.vMax; v += .006) pts.push([lado * B.corpo(v), v]); return pts; };
+  H.contornoCabeca = () => {
+    const pts = [];
+    for (let v = 0; v <= B.queixo; v += .004) pts.push([B.cabeca(v), v]);
+    for (let v = B.queixo; v >= 0; v -= .004) pts.push([-B.cabeca(v), v]);
+    pts.push(pts[0]);
+    return pts;
+  };
+  // amostra pontos das linhas para a animação de montagem
+  H.amostrar = (total) => {
+    const todos = [];
+    for (const l of H.linhas) for (const p of l.pts) todos.push([p[0], p[1], l.cor2 || l.cor]);
+    const passo = Math.max(1, todos.length / total);
+    H.amostras = [];
+    for (let i = 0; i < todos.length; i += passo) {
+      const [u, v, cor] = todos[i | 0];
+      H.amostras.push({ u, v, cor, atraso: rnd(.25, 1.55), cu: rnd(.35, .85) * (fem ? -1 : 1), cv: rnd(.15, .55) });
+    }
+  };
+  H.desenharLinha = (cg, pts) => { cg.beginPath(); pts.forEach((p, i) => i ? cg.lineTo(H.X(p[0]), H.Y(p[1])) : cg.moveTo(H.X(p[0]), H.Y(p[1]))); };
+  // partículas saindo da esfera de luz e formando o busto
+  H.montagem = (tm, corOrbe) => {
+    const orbe = [0, fem ? .95 : .98];
+    const fimParticulas = 1 - lim((tm - 2.5) / .7);
+    // esfera de luz
+    const ox = H.X(orbe[0]), oy = H.Y(orbe[1]);
+    const brilhoOrbe = tm < 2.6 ? lim(tm / .3) : .35 + P.nivel * .4;
+    const go = g.createRadialGradient(ox, oy, 0, ox, oy, H.S * (tm < 2.6 ? .07 : .035));
+    go.addColorStop(0, `rgba(255,255,255,${brilhoOrbe})`); go.addColorStop(.25, corOrbe(brilhoOrbe * .9)); go.addColorStop(1, corOrbe(0));
+    g.globalCompositeOperation = 'lighter';
+    g.fillStyle = go; g.fillRect(ox - H.S * .1, oy - H.S * .1, H.S * .2, H.S * .2);
+    if (fimParticulas <= 0) { g.globalCompositeOperation = 'source-over'; return; }
+    for (const a of H.amostras) {
+      const k = suave((tm - a.atraso) / 1.25);
+      if (k <= 0) continue;
+      const c = [orbe[0] + a.cu, orbe[1] - a.cv];
+      const m = 1 - k;
+      const u = m * m * orbe[0] + 2 * m * k * c[0] + k * k * a.u + Math.sin(k * 9 + a.atraso * 7) * .01 * m;
+      const v = m * m * orbe[1] + 2 * m * k * c[1] + k * k * a.v;
+      g.globalAlpha = fimParticulas * (.35 + .65 * k);
+      g.fillStyle = a.cor;
+      const s = 1.1 + (1 - k) * 1.4;
+      g.fillRect(H.X(u) - s / 2, H.Y(v) - s / 2, s, s);
+    }
+    g.globalAlpha = 1; g.globalCompositeOperation = 'source-over';
+  };
+  return H;
+}
+
+// anéis de HUD (marcas, arcos e leitura de dados) em volta da cabeça
+function anelHUD(cx, cy, S, t, n, aparece, rgb) {
+  const R = S * .335;
+  const vel = P.estado === 'pensando' ? 1.6 : .25 + n * .8;
+  g.save();
+  g.translate(cx, cy);
+  g.globalCompositeOperation = 'lighter';
+  g.strokeStyle = `rgb(${rgb})`; g.fillStyle = `rgb(${rgb})`;
+  // arco externo segmentado
+  g.lineWidth = 1.2; g.globalAlpha = (.22 + n * .3) * aparece;
+  for (let k = 0; k < 6; k++) {
+    const a0 = t * vel * .5 + k * Math.PI / 3;
+    g.beginPath(); g.arc(0, 0, R * 1.08, a0, a0 + Math.PI / 5); g.stroke();
+  }
+  // marcas de escala
+  g.globalAlpha = (.18 + n * .25) * aparece; g.lineWidth = 1;
+  g.beginPath();
+  for (let k = 0; k < 72; k++) {
+    const a = -t * vel * .3 + k * Math.PI / 36, r1 = R * (k % 6 ? 1.0 : .97);
+    g.moveTo(Math.cos(a) * r1, Math.sin(a) * r1); g.lineTo(Math.cos(a) * R * 1.02, Math.sin(a) * R * 1.02);
+  }
+  g.stroke();
+  // arco de intensidade (mostra o volume da voz)
+  g.globalAlpha = (.35 + n * .5) * aparece; g.lineWidth = 2.4;
+  g.beginPath(); g.arc(0, 0, R * 1.15, -Math.PI * .25, -Math.PI * .25 + Math.PI * .5 * (.08 + n * .92)); g.stroke();
+  g.globalAlpha = .12 * aparece; g.lineWidth = 2.4;
+  g.beginPath(); g.arc(0, 0, R * 1.15, -Math.PI * .25, Math.PI * .25); g.stroke();
+  // pontos orbitando
+  g.globalAlpha = .8 * aparece;
+  for (let k = 0; k < 3; k++) {
+    const a = t * (vel + .3) * (k % 2 ? -1 : 1) + k * 2.1, r = R * (1.08 + k * .035);
+    g.fillRect(Math.cos(a) * r - 1.5, Math.sin(a) * r - 1.5, 3, 3);
+  }
+  g.restore();
+}
+
+// ════════════════════════════════════════════════════════════════
+//  MODO 2 — HOLOGRAMA (ciano + núcleo laranja)
+// ════════════════════════════════════════════════════════════════
+const holograma = (() => {
+  const H = baseHolo(false);
+  const B = H.B;
+  let terreno = null, brilhosTerreno = [], veias = [], halo = [];
+  const CIANO = 'rgb(95,230,255)', LARANJA = 'rgb(255,170,60)';
+
+  function gerarVeias() {
+    const linhas = [];
+    const ramo = (x, y, ang, comp, prof) => {
+      const pts = [[x, y]]; let a = ang; const passos = 9;
+      for (let i = 0; i < passos; i++) {
+        a += rnd(-.38, .38); a = lim(a, -.9, .9);
+        x += Math.sin(a) * comp / passos; y += Math.cos(a) * comp / passos;
+        if (!B.dentroCorpo(x, y) && y > .62) break;
+        pts.push([x, y]);
+        if (prof < 3 && Math.random() < .2) ramo(x, y, a + (Math.random() < .5 ? -1 : 1) * rnd(.45, .9), comp * .5, prof + 1);
+      }
+      linhas.push({ pts, prof, fase: rnd(0, 6.28) });
+    };
+    ramo(0, .565, 0, .3, 0);
+    ramo(-.025, .6, -.18, .26, 1); ramo(.025, .6, .18, .26, 1);
+    ramo(-.05, .66, -.5, .2, 2); ramo(.05, .66, .5, .2, 2);
+    return linhas;
+  }
+
+  function gerarTerreno() {
+    const [c, cg] = novaCamada();
+    brilhosTerreno = [];
+    const camadas = celular ? 6 : 9;
+    const passo = celular ? 2.4 : 2;
+    // de trás para a frente: cada camada mais próxima cobre a anterior
+    for (let j = 0; j < camadas; j++) {
+      const perto = (j + 1) / camadas;
+      const base = A * (.5 + j * .052), amp = A * (.09 + perto * .13);
+      const f = [rnd(.0025, .0045), rnd(.008, .013), rnd(.02, .032)], fa = [rnd(0, 6), rnd(0, 6), rnd(0, 6)];
+      const fr = rnd(.004, .008), frp = rnd(0, 6);
+      const cume = [];
+      for (let x = -4; x <= L + 4; x += passo) {
+        const pico = k => 1 - Math.abs(Math.sin(x * f[k] + fa[k]));
+        const h = .58 * pico(0) ** 1.3 + .28 * pico(1) + .14 * pico(2);
+        const lado = .35 + 1.15 * Math.min(1, Math.abs(x - L / 2) / (L * .5));
+        cume.push([x, base - amp * lado * h, lado]);
+      }
+      // corpo escuro da montanha (esconde as camadas de trás)
+      cg.fillStyle = 'rgba(2,5,11,.93)';
+      cg.beginPath(); cg.moveTo(-4, A);
+      for (const [x, y] of cume) cg.lineTo(x, y);
+      cg.lineTo(L + 4, A); cg.closePath(); cg.fill();
+      for (const [x, y, lado] of cume) {
+        const a = (.3 + .65 * perto) * rnd(.55, 1);
+        cg.fillStyle = `rgba(90,210,255,${a})`;
+        cg.fillRect(x, y, 1.4, 1.4);
+        if (Math.random() < .02) brilhosTerreno.push([x, y]);
+        // encosta com pontos (mais densos perto do cume)
+        for (let k = 0; k < 9; k++) {
+          const d = Math.pow(Math.random(), 2.2) * amp * lado;
+          cg.fillStyle = `rgba(55,165,235,${a * (1 - d / (amp * lado + 1)) * rnd(.25, .7)})`;
+          cg.fillRect(x + rnd(-1.5, 1.5), y + d, 1.1, 1.1);
+        }
+        // rios de lava nos vales
+        if (Math.sin(x * fr + frp) > .35 && Math.random() < .5) {
+          const d = rnd(.08, .45) * amp * lado;
+          cg.fillStyle = `rgba(255,${rnd(120, 200) | 0},50,${(.35 + .6 * perto) * rnd(.4, 1)})`;
+          cg.fillRect(x, y + d, 1.5, 1.5);
+          if (Math.random() < .03) brilhosTerreno.push([x, y + d]);
+        }
+      }
+    }
+    // some suavemente no alto
+    const fade = cg.createLinearGradient(0, A * .25, 0, A * .5);
+    fade.addColorStop(0, 'rgba(0,0,0,1)'); fade.addColorStop(1, 'rgba(0,0,0,0)');
+    cg.globalCompositeOperation = 'destination-out';
+    cg.fillStyle = fade; cg.fillRect(0, 0, L, A * .5);
+    cg.globalCompositeOperation = 'source-over';
+    return c;
+  }
+
+  function gerarEstatico() {
+    H.linhas = [];
+    // linhas horizontais da cabeça
+    for (let v = .018; v < B.queixo - .008; v += .0115) {
+      const hw = B.cabeca(v) * .985, pts = [];
+      for (let i = 0; i <= 30; i++) { const u = -hw + 2 * hw * i / 30; pts.push([u, v + .008 * (1 - (u / hw) ** 2)]); }
+      H.linhas.push({ pts, cor: CIANO, alfa: .55, larg: 1.05, cor2: v > .14 && v < .5 ? LARANJA : CIANO });
+    }
+    // anéis do peito e ombros
+    const vAnel = Math.max(1.27, H.vMax + .15);
+    for (let r = .12; r < 1.9; r += .021) {
+      let atual = [];
+      const fechar = () => { if (atual.length > 2) H.linhas.push({ pts: atual, cor: CIANO, alfa: .3, larg: .9 }); atual = []; };
+      for (let a = Math.PI; a <= Math.PI * 2; a += .012) {
+        const u = Math.cos(a) * r, v = vAnel + Math.sin(a) * r * .6;
+        if (B.dentroCorpo(u, v) && v < H.vMax) atual.push([u, v]); else fechar();
+      }
+      fechar();
+    }
+    // linhas do pescoço
+    for (let k = -4; k <= 4; k++) {
+      const pts = [];
+      for (let v = .52; v < .72; v += .01) pts.push([k * .022 * (1 + (v - .52) * 1.6), v]);
+      H.linhas.push({ pts, cor: CIANO, alfa: .18, larg: .8 });
+    }
+    veias = gerarVeias();
+    H.amostrar(celular ? 1100 : 2000);
+
+    const [c, cg] = novaCamada();
+    cg.fillStyle = 'rgba(2,6,14,.94)';
+    H.caminhoCorpo(cg); cg.fill();
+    H.caminhoCabeca(cg); cg.fill();
+    cg.globalCompositeOperation = 'lighter';
+    cg.lineCap = 'round';
+    for (const l of H.linhas) {
+      cg.globalAlpha = l.alfa; cg.strokeStyle = l.cor; cg.lineWidth = l.larg;
+      H.desenharLinha(cg, l.pts); cg.stroke();
+    }
+    // contornos com brilho
+    cg.globalAlpha = 1;
+    cg.shadowColor = '#00c8ff';
+    const contornos = [H.contornoCabeca(), H.contornoCorpo(-1), H.contornoCorpo(1)];
+    for (const [larg, blur, cor] of [[6, 26, 'rgba(0,170,255,.35)'], [2.6, 14, 'rgba(110,235,255,.95)'], [1.1, 4, 'rgba(230,255,255,.9)']]) {
+      cg.lineWidth = larg; cg.shadowBlur = blur * DPR; cg.strokeStyle = cor;
+      for (const pts of contornos) { H.desenharLinha(cg, pts); cg.stroke(); }
+    }
+    cg.shadowBlur = 0;
+    // contorno interno da cabeça
+    cg.globalAlpha = .5; cg.lineWidth = 1; cg.strokeStyle = CIANO;
+    cg.beginPath();
+    for (let v = .03; v <= B.queixo - .03; v += .004) cg.lineTo(H.X(B.cabeca(v) * .93), H.Y(v));
+    cg.stroke(); cg.beginPath();
+    for (let v = .03; v <= B.queixo - .03; v += .004) cg.lineTo(H.X(-B.cabeca(v) * .93), H.Y(v));
+    cg.stroke();
+    H.estatico = c;
+  }
+
+  function novaParticulaHalo(inicio) {
+    const a = rnd(-Math.PI * .95, -Math.PI * .05);
+    const r = 1 + rnd(0, .08);
+    return { u: Math.cos(a) * .2 * r, v: .26 + Math.sin(a) * .27 * r, du: Math.cos(a) * rnd(.004, .02), dv: Math.sin(a) * rnd(.006, .025) - .006,
+      vida: inicio ? rnd(0, 1) : 0, dur: rnd(1.5, 4) };
+  }
+
+  return {
+    entrar() { H.t0 = tempo; if (!H.estatico) this.redim(); },
+    redim() {
+      H.layout(); terreno = gerarTerreno(); gerarEstatico();
+      halo = Array.from({ length: celular ? 160 : 280 }, () => novaParticulaHalo(true));
+    },
+    desenhar(dt) {
+      const tm = tempo - H.t0, t = tempo, n = P.nivel, S = H.S;
+      const aparece = suave((tm - 2.1) / .8);
+      // fundo
+      g.fillStyle = '#02050b'; g.fillRect(0, 0, L, A);
+      g.globalAlpha = .55 + .45 * suave(tm / 1.5);
+      g.drawImage(terreno, 0, 0, L, A);
+      g.globalCompositeOperation = 'lighter';
+      for (let i = 0; i < 26; i++) {
+        const p = brilhosTerreno[(Math.random() * brilhosTerreno.length) | 0];
+        if (!p) break;
+        g.globalAlpha = rnd(.3, .9); g.fillStyle = Math.random() < .3 ? LARANJA : CIANO;
+        g.fillRect(p[0] - 1, p[1] - 1, 2.2, 2.2);
+      }
+      // anéis quando está ouvindo
+      if (P.estado === 'ouvindo' || P.estado === 'pensando') {
+        g.strokeStyle = CIANO; g.lineWidth = 1;
+        for (let k = 0; k < 4; k++) {
+          const f = (t * (P.estado === 'pensando' ? .9 : .45) + k / 4) % 1;
+          g.globalAlpha = (1 - f) * (.1 + n * .5) * aparece;
+          g.beginPath(); g.ellipse(H.X(0), H.Y(.29), S * (.24 + f * .35), S * (.31 + f * .35), 0, 0, Math.PI * 2); g.stroke();
+        }
+      }
+      g.globalCompositeOperation = 'source-over'; g.globalAlpha = 1;
+      if (aparece > 0) {
+        g.globalAlpha = aparece;
+        g.drawImage(H.estatico, 0, 0, L, A);
+        if (n > .05) { g.globalCompositeOperation = 'lighter'; g.globalAlpha = aparece * n * .55; g.drawImage(H.estatico, 0, 0, L, A); }
+        g.globalCompositeOperation = 'lighter';
+        // núcleo laranja do rosto
+        const fx = H.X(0), fy = H.Y(.33);
+        const forca = (.5 + P.brilho * .25 + n * .6) * aparece;
+        const nucleo = g.createRadialGradient(fx, fy, 0, fx, fy, S * (.19 + n * .04));
+        nucleo.addColorStop(0, `rgba(255,240,170,${.75 * forca})`);
+        nucleo.addColorStop(.35, `rgba(255,160,40,${.55 * forca})`);
+        nucleo.addColorStop(.75, `rgba(255,90,10,${.18 * forca})`);
+        nucleo.addColorStop(1, 'rgba(255,80,0,0)');
+        g.globalAlpha = 1; g.fillStyle = nucleo; g.fillRect(fx - S * .3, fy - S * .3, S * .6, S * .6);
+        // ondas do rosto
+        const amp = .0022 + n * .013 + (P.estado === 'pensando' ? .004 : 0);
+        const vel = 3 + n * 6 + P.energia * 2;
+        g.lineWidth = 1.3;
+        for (let v = .12; v < .53; v += .0115) {
+          const hw = B.cabeca(v) * .9;
+          const a = forca * Math.exp(-(((v - .33) / .14) ** 2));
+          if (a < .03) continue;
+          const lg = g.createLinearGradient(H.X(-hw), 0, H.X(hw), 0);
+          lg.addColorStop(0, 'rgba(255,140,40,0)');
+          lg.addColorStop(.5, `rgba(255,${(200 + n * 50) | 0},${(90 + n * 90) | 0},${lim(a)})`);
+          lg.addColorStop(1, 'rgba(255,140,40,0)');
+          g.strokeStyle = lg; g.beginPath();
+          for (let i = 0; i <= 28; i++) {
+            const u = -hw + 2 * hw * i / 28;
+            let dv = amp * Math.sin(u * 26 + t * vel + v * 9) + amp * .4 * Math.sin(u * 47 - t * vel * .7);
+            if (P.estado === 'pensando') dv += .005 * Math.sin(Math.atan2(v - .33, u) * 3 + t * 5);
+            const y = H.Y(v + .008 * (1 - (u / hw) ** 2) + dv);
+            i ? g.lineTo(H.X(u), y) : g.moveTo(H.X(u), y);
+          }
+          g.stroke();
+        }
+        // veias
+        g.lineCap = 'round';
+        for (const ve of veias) {
+          const pul = .45 + .35 * Math.sin(t * 2.2 + ve.fase) + n * .7;
+          g.globalAlpha = lim(pul) * aparece * (1 - ve.prof * .15);
+          g.strokeStyle = 'rgba(255,150,40,.9)'; g.lineWidth = 1.7 - ve.prof * .3;
+          H.desenharLinha(g, ve.pts); g.stroke();
+          g.globalAlpha *= .3; g.lineWidth = 5; g.stroke();
+        }
+        // anéis de HUD girando em volta da cabeça
+        anelHUD(H.X(0), H.Y(.29), S, t, n, aparece, '95,230,255');
+        // poeira de luz em volta da cabeça
+        g.fillStyle = '#7fe6ff';
+        for (let i = 0; i < halo.length; i++) {
+          const p = halo[i];
+          p.vida += dt / p.dur;
+          if (p.vida >= 1) { halo[i] = novaParticulaHalo(false); continue; }
+          const k = 1 + n * 3;
+          p.u += p.du * dt * k; p.v += p.dv * dt * k;
+          g.globalAlpha = Math.sin(p.vida * Math.PI) * .75 * aparece;
+          g.fillRect(H.X(p.u), H.Y(p.v), 1.4, 1.4);
+        }
+        g.globalAlpha = 1; g.globalCompositeOperation = 'source-over';
+        // texto de status
+        g.globalAlpha = .85 * aparece;
+        g.fillStyle = CIANO;
+        g.font = `${Math.max(9, Math.round(S * .015))}px ui-monospace, Consolas, monospace`;
+        if (L >= 640) { g.textAlign = 'right'; g.fillText(textoStatus(), H.X(-.42), H.Y(.12)); g.textAlign = 'left'; }
+        g.textAlign = 'left'; g.globalAlpha = 1;
+      }
+      H.montagem(tm, a => `rgba(80,210,255,${a})`);
+    }
+  };
+})();
+
+// ════════════════════════════════════════════════════════════════
+//  MODO 3 — TEMPESTADE (busto masculino neon, fumaça e raios)
+// ════════════════════════════════════════════════════════════════
+const tempestade = (() => {
+  const H = baseHolo(false);
+  const B = H.B;
+  let fumacas = [], raios = [], brilhos = [];
+  const LUZ = 'rgb(232,210,255)', OURO = 'rgb(255,190,110)', ROXO = 'rgb(170,110,255)', AZUL = 'rgb(140,170,255)';
+
+  function linha(pts, cor, alfa, larg, filtrar) {
+    if (filtrar) pts = pts.filter(p => B.dentroCorpo(p[0], p[1]));
+    if (pts.length > 2) H.linhas.push({ pts, cor, alfa, larg });
+  }
+  const espelho = (fn) => { for (const s of [-1, 1]) fn(s); };
+
+  function gerarEstatico() {
+    H.linhas = [];
+    // cabelo curto, penteado para cima (energia no topo da cabeça)
+    const topoCab = u => B.vc - B.vc * Math.sqrt(Math.max(0, 1 - (u / .2) ** 2));
+    for (let i = 0; i < (celular ? 46 : 70); i++) {
+      const u0 = rnd(-.165, .165);
+      const v0 = .105 + .07 * (u0 / .165) ** 2 + rnd(-.008, .008);
+      const u3 = lim(u0 * 1.18 + rnd(-.015, .015), -.2, .2);
+      const v3 = topoCab(u3) - rnd(.008, .04);
+      linha(curva([u0, v0], [u0 * 1.05, v0 - .04], [u3 * .98, v3 + .05], [u3, v3], 18),
+        Math.random() < .22 ? OURO : LUZ, rnd(.3, .75), rnd(.7, 1.4));
+    }
+    // costeletas
+    for (let i = 0; i < 10; i++) {
+      const s = i % 2 ? 1 : -1;
+      linha(curva([s * rnd(.165, .18), rnd(.11, .14)], [s * rnd(.18, .19), .17], [s * rnd(.185, .195), .21], [s * rnd(.18, .19), rnd(.24, .28)], 12), LUZ, rnd(.3, .6), rnd(.7, 1.2));
+    }
+    espelho(s => {
+      // rosto: maxilar, maçãs, sobrancelhas
+      linha(curva([s * .19, .35], [s * .185, .46], [s * .11, .56], [s * .02, .573], 24), LUZ, .55, 1.3);
+      linha(curva([s * .175, .28], [s * .15, .31], [s * .1, .345], [s * .06, .36], 16), ROXO, .35, 1);
+      linha(curva([s * .155, .205], [s * .12, .19], [s * .06, .2], [s * .02, .215], 16), LUZ, .55, 1.4);
+      // pescoço: esternocleidomastoideo e trapézio
+      linha(curva([s * .12, .45], [s * .1, .55], [s * .06, .62], [s * .025, .68], 20), LUZ, .45, 1.1);
+      linha(curva([s * .1, .55], [s * .14, .68], [s * .32, .72], [s * .47, .78], 26), LUZ, .55, 1.3, true);
+      // clavículas
+      linha(curva([s * .03, .695], [s * .15, .67], [s * .3, .72], [s * .42, .735], 24), OURO, .65, 1.4, true);
+      // peitorais (várias linhas paralelas)
+      for (let k = 0; k < 6; k++) {
+        const o = k * .016;
+        linha(curva([s * .015, .74 + o * .5], [s * (.04 + o * .3), .93 - o * .4], [s * (.3 - o), .96 - o], [s * (.43 - o * .8), .8 + o * .3], 30), k % 3 ? LUZ : OURO, .62 - k * .07, 1.4 - k * .12, true);
+      }
+      // deltoides
+      for (let k = 0; k < 5; k++) {
+        const o = k * .018;
+        linha(curva([s * (.38 + o * .2), .745 + o * .3], [s * (.55 + o * .3), .74 + o], [s * (.66 - o * .2), .9], [s * (.6 - o * .3), 1.08], 28), k ? LUZ : OURO, .55 - k * .08, 1.3 - k * .12, true);
+      }
+      // linhas de energia descendo
+      for (let k = 0; k < (celular ? 5 : 8); k++) {
+        linha(curva([s * rnd(0, .03), rnd(.66, .7)], [s * rnd(.05, .15), rnd(.75, .85)], [s * rnd(.1, .25), rnd(.9, 1.05)], [s * rnd(.05, .3), rnd(1.05, 1.3)], 26),
+          Math.random() < .4 ? OURO : AZUL, rnd(.2, .45), rnd(.6, 1.1), true);
+      }
+      // abdômen
+      for (let k = 0; k < 3; k++) linha(curva([s * .015, 1.0 + k * .07], [s * .06, .99 + k * .07], [s * .11, 1.0 + k * .07], [s * .13, 1.03 + k * .07], 12), LUZ, .3, 1, true);
+    });
+    linha(curva([0, .7], [0, .85], [0, 1.0], [0, 1.25], 20), LUZ, .4, 1.1, true);
+    // contornos suaves do rosto
+    for (let v = .07; v < B.queixo - .02; v += .028) {
+      const hw = B.cabeca(v) * .92, pts = [];
+      for (let i = 0; i <= 20; i++) { const u = -hw + 2 * hw * i / 20; pts.push([u, v + .01 * (1 - (u / hw) ** 2)]); }
+      H.linhas.push({ pts, cor: ROXO, alfa: .1, larg: .8 });
+    }
+    H.amostrar(celular ? 1000 : 1800);
+    brilhos = [];
+    for (const l of H.linhas) for (const p of l.pts) if (Math.random() < .12) brilhos.push({ u: p[0], v: p[1], f: rnd(0, 6.28), vel: rnd(1, 4) });
+
+    const [c, cg] = novaCamada();
+    cg.fillStyle = 'rgba(8,3,18,.9)';
+    H.caminhoCorpo(cg); cg.fill(); H.caminhoCabeca(cg); cg.fill();
+    cg.globalCompositeOperation = 'lighter'; cg.lineCap = 'round';
+    cg.shadowColor = '#8f3dff';
+    for (const l of H.linhas) {
+      cg.globalAlpha = l.alfa; cg.strokeStyle = l.cor; cg.lineWidth = l.larg; cg.shadowBlur = 8 * DPR;
+      H.desenharLinha(cg, l.pts); cg.stroke();
+    }
+    cg.globalAlpha = 1;
+    const contornos = [H.contornoCabeca(), H.contornoCorpo(-1), H.contornoCorpo(1)];
+    for (const [larg, blur, cor] of [[6, 26, 'rgba(140,60,255,.35)'], [2.4, 14, 'rgba(220,190,255,.9)'], [1, 4, 'rgba(250,245,255,.9)']]) {
+      cg.lineWidth = larg; cg.shadowBlur = blur * DPR; cg.strokeStyle = cor;
+      for (const pts of contornos) { H.desenharLinha(cg, pts); cg.stroke(); }
+    }
+    cg.shadowBlur = 0;
+    H.estatico = c;
+  }
+
+  function novoRaio() {
+    const s = Math.random() < .5 ? -1 : 1;
+    const v0 = rnd(.05, .9);
+    const u0 = s * (v0 < B.queixo ? B.cabeca(v0) + .02 : B.corpo(v0));
+    let pts = [[u0, v0], [u0 + s * rnd(.35, .9), v0 + rnd(-.35, .25)]];
+    for (let nivel = 0; nivel < 6; nivel++) {
+      const novo = [pts[0]];
+      for (let i = 1; i < pts.length; i++) {
+        const a = pts[i - 1], b = pts[i], d = Math.hypot(b[0] - a[0], b[1] - a[1]);
+        novo.push([(a[0] + b[0]) / 2 + rnd(-.5, .5) * d * .35, (a[1] + b[1]) / 2 + rnd(-.5, .5) * d * .35], b);
+      }
+      pts = novo;
+    }
+    return { pts, vida: 0, dur: rnd(.12, .3) };
+  }
+
+  return {
+    entrar() { H.t0 = tempo; if (!H.estatico) this.redim(); },
+    redim() {
+      H.layout(); gerarEstatico();
+      fumacas = Array.from({ length: celular ? 6 : 9 }, (_, i) => ({ x: rnd(0, 1), y: rnd(.1, 1), r: rnd(.25, .55), f: rnd(0, 6), v: rnd(.05, .15), a: rnd(.08, .17), azul: i % 3 === 0 }));
+    },
+    desenhar(dt) {
+      const tm = tempo - H.t0, t = tempo, n = P.nivel, S = H.S;
+      const aparece = suave((tm - 2.1) / .8);
+      const bg = g.createLinearGradient(0, 0, 0, A);
+      bg.addColorStop(0, '#0e0522'); bg.addColorStop(1, '#04010b');
+      g.fillStyle = bg; g.fillRect(0, 0, L, A);
+      g.globalCompositeOperation = 'lighter';
+      const M = Math.max(L, A);
+      for (const f of fumacas) {
+        const x = (f.x + Math.sin(t * f.v + f.f) * .08) * L, y = (f.y + Math.cos(t * f.v * .8 + f.f) * .06) * A;
+        const gr = g.createRadialGradient(x, y, 0, x, y, f.r * M);
+        const c = f.azul ? '60,70,220' : '110,45,220';
+        gr.addColorStop(0, `rgba(${c},${f.a * (1 + n * .6)})`); gr.addColorStop(.6, `rgba(${c},${f.a * .3})`); gr.addColorStop(1, `rgba(${c},0)`);
+        g.fillStyle = gr; g.fillRect(x - f.r * M, y - f.r * M, f.r * M * 2, f.r * M * 2);
+      }
+      g.lineWidth = 1.1;
+      for (let i = 0; i < 5; i++) {
+        g.strokeStyle = `rgba(200,180,255,${.1 + n * .15})`;
+        g.beginPath();
+        for (let x = -20; x <= L + 20; x += 12) {
+          const y = A * (.16 + i * .17) + Math.sin(x * .0035 + t * .35 + i * 1.7) * A * .07 + Math.sin(x * .011 - t * .25 + i) * A * .02;
+          x === -20 ? g.moveTo(x, y) : g.lineTo(x, y);
+        }
+        g.stroke();
+      }
+      g.globalCompositeOperation = 'source-over';
+      if (aparece > 0) {
+        g.globalAlpha = aparece;
+        g.drawImage(H.estatico, 0, 0, L, A);
+        g.globalCompositeOperation = 'lighter';
+        g.globalAlpha = aparece * (.15 + n * .65 + .1 * Math.sin(t * 1.5));
+        g.drawImage(H.estatico, 0, 0, L, A);
+        anelHUD(H.X(0), H.Y(.29), S, t, n, aparece, '200,160,255');
+        // olhos
+        const olho = (.25 + n * .75 + (P.estado === 'pensando' ? .3 * Math.sin(t * 8) : 0)) * aparece;
+        for (const s of [-1, 1]) {
+          const ex = H.X(s * .075), ey = H.Y(.29);
+          const go = g.createRadialGradient(ex, ey, 0, ex, ey, S * .05);
+          go.addColorStop(0, `rgba(255,250,255,${lim(olho)})`); go.addColorStop(.3, `rgba(190,120,255,${lim(olho) * .6})`); go.addColorStop(1, 'rgba(150,80,255,0)');
+          g.globalAlpha = 1; g.fillStyle = go; g.fillRect(ex - S * .05, ey - S * .05, S * .1, S * .1);
+          g.fillStyle = `rgba(255,255,255,${lim(olho)})`; g.fillRect(ex - S * .022, ey - 1, S * .044, 2);
+        }
+        // núcleo de energia no peito
+        const cx = H.X(0), cy = H.Y(.86);
+        const r0 = S * (.035 + n * .02);
+        const gc = g.createRadialGradient(cx, cy, 0, cx, cy, S * (.13 + n * .08));
+        gc.addColorStop(0, `rgba(255,240,255,${(.5 + n * .5) * aparece})`); gc.addColorStop(.25, `rgba(180,110,255,${(.3 + n * .4) * aparece})`); gc.addColorStop(1, 'rgba(120,60,255,0)');
+        g.globalAlpha = 1; g.fillStyle = gc; g.fillRect(cx - S * .25, cy - S * .25, S * .5, S * .5);
+        g.strokeStyle = `rgba(230,210,255,${.6 * aparece})`; g.lineWidth = 1.2;
+        for (let k = 0; k < 3; k++) {
+          g.beginPath(); g.arc(cx, cy, r0 * (1.4 + k * .7), t * (k % 2 ? -1.2 : .9) + k, t * (k % 2 ? -1.2 : .9) + k + Math.PI * 1.3); g.stroke();
+        }
+        // brilhos nas linhas
+        g.fillStyle = '#f6eeff';
+        for (const b of brilhos) {
+          const s = Math.sin(t * b.vel + b.f);
+          if (s < .8 - n * .4) continue;
+          g.globalAlpha = (s - .5) * 1.6 * aparece;
+          g.fillRect(H.X(b.u) - 1, H.Y(b.v) - 1, 2, 2);
+        }
+        // raios
+        if (n > .3 && Math.random() < dt * (2 + n * 10)) raios.push(novoRaio());
+        if (P.estado === 'pensando' && Math.random() < dt * 1.5) raios.push(novoRaio());
+        raios = raios.filter(r => (r.vida += dt) < r.dur);
+        for (const r of raios) {
+          const a = 1 - r.vida / r.dur;
+          g.globalAlpha = a * .35; g.strokeStyle = '#9a5cff'; g.lineWidth = 5;
+          H.desenharLinha(g, r.pts); g.stroke();
+          g.globalAlpha = a; g.strokeStyle = '#f8f2ff'; g.lineWidth = 1.3; g.stroke();
+        }
+        g.globalCompositeOperation = 'source-over';
+        g.globalAlpha = .8 * aparece; g.fillStyle = 'rgb(215,190,255)';
+        g.font = `${Math.max(9, Math.round(S * .015))}px ui-monospace, Consolas, monospace`;
+        if (L >= 640) { g.textAlign = 'right'; g.fillText(textoStatus(), H.X(-.42), H.Y(.12)); g.textAlign = 'left'; }
+        g.textAlign = 'left'; g.globalAlpha = 1;
+      }
+      H.montagem(tm, a => `rgba(180,120,255,${a})`);
+    }
+  };
+})();
+
+// ════════════════════════════════════════════════════════════════
+//  MODO NÚCLEO — o "meu" Jarvis: reator de arco com anéis de HUD,
+//  anel de onda sonora reativo à voz e leituras orbitando.
+// ════════════════════════════════════════════════════════════════
+const nucleo = (() => {
+  const CI = '95,215,255', CI2 = '150,235,255', OU = '255,200,120', BR = '235,250,255';
+  // anéis concêntricos girando
+  const aneis = [
+    { r: 1.06, vel: .05, seg: 0, larg: 1.4, a: .22 },
+    { r: 0.98, vel: -.16, seg: 24, larg: 2.6, a: .6 },
+    { r: 0.88, vel: .26, seg: 4, larg: 4.5, a: .8, arco: Math.PI * .42, ouro: true },
+    { r: 0.78, vel: -.1, seg: 72, larg: 1.2, a: .38 },
+    { r: 0.66, vel: .45, seg: 3, larg: 3.4, a: .75, arco: Math.PI * .5 },
+    { r: 0.30, vel: -.7, seg: 6, larg: 2.4, a: .6 }
+  ];
+  const orbes = Array.from({ length: 10 }, (_, i) => ({ r: .6 + Math.random() * .5, a0: Math.random() * 6.28, vel: (.15 + Math.random() * .4) * (i % 2 ? -1 : 1), tam: 1.2 + Math.random() * 1.8 }));
+  const poeira = Array.from({ length: celular ? 50 : 100 }, () => ({ x: Math.random(), y: Math.random(), v: rnd(.002, .01), a: Math.random() * .4 }));
+  const Nw = 120; // pontos do anel de onda
+  const t0ref = { v: 0 };
+  let leituras = [];
+  function gerarLeituras() {
+    const r = () => Math.floor(Math.random() * 10);
+    leituras = Array.from({ length: 5 }, () => `0x${r()}${r()}${r()}${r()}·${r()}${r()}`);
+  }
+  gerarLeituras();
+
+  function arco(cx, cy, raio, a0, a1, larg, cor, alfa) {
+    g.globalAlpha = alfa; g.strokeStyle = `rgb(${cor})`; g.lineWidth = larg;
+    g.beginPath(); g.arc(cx, cy, raio, a0, a1); g.stroke();
+  }
+
+  return {
+    entrar() { t0ref.v = tempo; },
+    redim() {},
+    desenhar(dt) {
+      const t = tempo, n = P.nivel, S = Math.min(L, A);
+      const CX = L / 2, CY = A * (L < 640 ? .42 : .45);
+      const R = S * (celular ? .34 : .30) * (1 + n * .06);
+      if (Math.random() < dt * .6) gerarLeituras();
+      // fundo
+      const bg = g.createRadialGradient(CX, CY, 0, CX, CY, Math.max(L, A) * .7);
+      bg.addColorStop(0, '#0a1a33'); bg.addColorStop(.5, '#060f20'); bg.addColorStop(1, '#02060d');
+      g.fillStyle = bg; g.fillRect(0, 0, L, A);
+      // poeira
+      g.fillStyle = `rgb(${CI})`;
+      for (const p of poeira) { p.y -= p.v * dt * 6; if (p.y < 0) { p.y = 1; p.x = Math.random(); } g.globalAlpha = p.a * (.4 + P.brilho * .4); g.fillRect(p.x * L, p.y * A, 1.1, 1.1); }
+      g.globalCompositeOperation = 'lighter';
+      // brilho central
+      const forca = .5 + P.brilho * .3 + n * .5;
+      let gl = g.createRadialGradient(CX, CY, 0, CX, CY, R * 1.3);
+      gl.addColorStop(0, `rgba(${CI2},${.12 + n * .3})`); gl.addColorStop(1, `rgba(${CI},0)`);
+      g.globalAlpha = 1; g.fillStyle = gl; g.fillRect(CX - R * 1.5, CY - R * 1.5, R * 3, R * 3);
+
+      // anéis de HUD girando
+      for (const an of aneis) {
+        const ang = t * (an.vel + (P.estado === 'pensando' ? an.vel * 2 : 0)) + an.a0 * 0;
+        const raio = R * an.r;
+        if (!an.seg) { arco(CX, CY, raio, 0, Math.PI * 2, an.larg, CI, an.a * forca); continue; }
+        if (an.arco) {
+          for (let k = 0; k < an.seg; k++) {
+            const a = ang + k * (Math.PI * 2 / an.seg);
+            const cor = an.ouro ? OU : (k % 2 ? OU : CI2);
+            arco(CX, CY, raio, a, a + an.arco, an.larg, cor, an.a * forca);
+            if (an.ouro) arco(CX, CY, raio, a, a + an.arco, an.larg * 2.4, OU, an.a * forca * .25); // brilho
+          }
+        } else {
+          g.globalAlpha = an.a * forca * .8; g.strokeStyle = `rgb(${CI})`; g.lineWidth = an.larg; g.beginPath();
+          for (let k = 0; k < an.seg; k++) {
+            const a = ang + k * (Math.PI * 2 / an.seg);
+            const r1 = raio - an.larg * 2.5, r2 = raio + an.larg * 2.5;
+            g.moveTo(CX + Math.cos(a) * r1, CY + Math.sin(a) * r1); g.lineTo(CX + Math.cos(a) * r2, CY + Math.sin(a) * r2);
+          }
+          g.stroke();
+        }
+      }
+
+      // anel de onda sonora reativo
+      const Rw = R * 1.08;
+      g.globalAlpha = .5 + n * .5; g.lineWidth = 2; g.strokeStyle = `rgb(${CI2})`;
+      g.beginPath();
+      for (let i = 0; i <= Nw; i++) {
+        const a = i / Nw * Math.PI * 2;
+        const w = (.02 + n * .22) * (Math.sin(a * 6 + t * 5) * .5 + Math.sin(a * 13 - t * 7) * .3 + Math.sin(a * 3 + t * 3) * .2);
+        const rr = Rw * (1 + w);
+        const x = CX + Math.cos(a) * rr, y = CY + Math.sin(a) * rr;
+        i ? g.lineTo(x, y) : g.moveTo(x, y);
+      }
+      g.closePath(); g.stroke();
+      // reflexo externo da onda
+      g.globalAlpha = (.15 + n * .3); g.lineWidth = 6; g.stroke();
+
+      // orbes
+      for (const o of orbes) {
+        const a = o.a0 + t * o.vel, rr = R * o.r;
+        const x = CX + Math.cos(a) * rr, y = CY + Math.sin(a) * rr;
+        g.globalAlpha = .7; g.fillStyle = `rgb(${BR})`;
+        g.fillRect(x - o.tam / 2, y - o.tam / 2, o.tam, o.tam);
+        g.globalAlpha = .15; g.fillRect(x - o.tam * 1.5, y - o.tam * 1.5, o.tam * 3, o.tam * 3);
+      }
+
+      // ░░ NÚCLEO NEURAL ░░ íris de lâminas + órbitas de luz 3D + plasma (original, IA do futuro)
+      const rc = R * .4;
+      const pulso = 1 + n * .5 + .06 * Math.sin(t * 3);
+      const VIO = '150,190,255'; // iridescência fria
+      // íris de lâminas — 3 anéis de arcos curtos em contra-rotação (abrem com a voz)
+      for (let camada = 0; camada < 3; camada++) {
+        const raioL = rc * (1.04 + camada * .3);
+        const N = 10 + camada * 4;
+        const giro = t * (.5 - camada * .12) * (camada % 2 ? -1 : 1);
+        const vao = (Math.PI * 2 / N) * (.28 + n * .22 - camada * .03);
+        g.lineWidth = 3.4 - camada * .8; g.strokeStyle = `rgb(${camada === 1 ? VIO : CI})`;
+        for (let k = 0; k < N; k++) {
+          const a = giro + k * (Math.PI * 2 / N);
+          g.globalAlpha = (.78 - camada * .14) * forca;
+          g.beginPath(); g.arc(CX, CY, raioL, a, a + vao); g.stroke();
+        }
+      }
+      // órbitas de luz em 3D (giroscópio) — assinatura: trilho brilhante + partículas com rastro
+      for (let o = 0; o < 3; o++) {
+        const rot = o * (Math.PI / 3) + t * (.35 + o * .12);
+        const rx = rc * (1.55 + o * .12);
+        const ry = rx * (.18 + .8 * Math.abs(Math.cos(Math.sin(t * (.4 + o * .15) + o) * 1.2)));
+        const cor = o === 1 ? VIO : CI2;
+        const ponto = ang => [CX + rx * Math.cos(ang) * Math.cos(rot) - ry * Math.sin(ang) * Math.sin(rot),
+                              CY + rx * Math.cos(ang) * Math.sin(rot) + ry * Math.sin(ang) * Math.cos(rot)];
+        // trilho: brilho largo por baixo + linha nítida por cima
+        g.strokeStyle = `rgb(${cor})`;
+        g.globalAlpha = (.16 + n * .2) * forca; g.lineWidth = 6.5;
+        g.beginPath(); g.ellipse(CX, CY, rx, ry, rot, 0, Math.PI * 2); g.stroke();
+        g.globalAlpha = (.6 + n * .35) * forca; g.lineWidth = 2.6;
+        g.beginPath(); g.ellipse(CX, CY, rx, ry, rot, 0, Math.PI * 2); g.stroke();
+        // 2 partículas de luz correndo, cada uma com rastro
+        const vel = 1.1 + o * .5;
+        for (let p = 0; p < 2; p++) {
+          const base = t * vel + p * Math.PI;
+          for (let tr = 6; tr >= 0; tr--) {
+            const [x, y] = ponto(base - tr * .085);
+            const a = 1 - tr / 7;
+            g.globalAlpha = a * a * forca; g.fillStyle = tr ? `rgb(${cor})` : '#f4ffff';
+            const s = tr ? 2.4 * a : 3.6;
+            g.fillRect(x - s / 2, y - s / 2, s, s);
+          }
+          const [hx, hy] = ponto(base);
+          g.globalAlpha = .28 * forca; g.fillStyle = '#eaffff'; g.fillRect(hx - 7, hy - 7, 14, 14);
+        }
+      }
+      // plasma central que respira (branco-azulado)
+      const halo = g.createRadialGradient(CX, CY, 0, CX, CY, rc * 1.15 * pulso);
+      halo.addColorStop(0, `rgba(255,255,255,${forca})`);
+      halo.addColorStop(.3, `rgba(200,244,255,${.85 * forca})`);
+      halo.addColorStop(.6, `rgba(${CI2},${.45 * forca})`);
+      halo.addColorStop(.85, `rgba(${VIO},${.2 * forca})`);
+      halo.addColorStop(1, `rgba(${CI},0)`);
+      g.globalAlpha = 1; g.fillStyle = halo; g.fillRect(CX - rc * 1.3, CY - rc * 1.3, rc * 2.6, rc * 2.6);
+      g.fillStyle = `rgba(255,255,255,${forca})`;
+      g.beginPath(); g.arc(CX, CY, rc * .3 * pulso, 0, Math.PI * 2); g.fill();
+
+      g.globalCompositeOperation = 'source-over';
+      // leituras de dados
+      g.globalAlpha = .7; g.fillStyle = `rgb(${CI})`;
+      g.font = `${Math.max(9, Math.round(S * .015))}px ui-monospace, Consolas, monospace`;
+      const et = { espera: 'STANDBY', ouvindo: 'OUVINDO', pensando: 'PROCESSANDO', falando: 'FALANDO' }[P.estado] || 'STANDBY';
+      g.textAlign = 'left'; g.fillText(`NÚCLEO · ${et}`, CX - R, CY - R - S * .03);
+      g.textAlign = 'right'; g.fillText(`NEURAL ${Math.round((.4 + n * .6) * 100)}%`, CX + R, CY - R - S * .03);
+      if (L >= 640) { g.globalAlpha = .4; g.textAlign = 'left'; leituras.forEach((l, i) => g.fillText(l, CX + R + S * .01, CY - R * .3 + i * S * .022)); }
+      g.textAlign = 'left'; g.globalAlpha = 1;
+    }
+  };
+})();
+
+// ════════════════════════════════════════════════════════════════
+//  MODO VISÃO — câmera do aparelho com HUD de scanner (cosmético)
+//  NÃO reconhece pessoas, não mostra nome/endereço, não marca "ameaça".
+//  É só um efeito visual sobre a imagem da sua câmera.
+// ════════════════════════════════════════════════════════════════
+const camera = (() => {
+  let video = null, stream = null, estadoCam = 'parado', erro = '', t0 = 0, usandoTras = true;
+  function criarVideo() {
+    if (video) return;
+    video = document.createElement('video');
+    video.setAttribute('playsinline', ''); video.muted = true; video.autoplay = true;
+    video.style.cssText = 'position:fixed;width:1px;height:1px;opacity:0;pointer-events:none;left:-10px;top:-10px;';
+    document.body.appendChild(video);
+  }
+  async function abrir() {
+    criarVideo();
+    estadoCam = 'abrindo'; erro = '';
+    try {
+      stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: usandoTras ? { ideal: 'environment' } : 'user' }, audio: false });
+      video.srcObject = stream; await video.play().catch(() => {});
+      estadoCam = 'ligado';
+    } catch (e) {
+      estadoCam = 'erro';
+      erro = e.name === 'NotAllowedError' ? 'permita o uso da câmera' : e.name === 'NotFoundError' ? 'nenhuma câmera encontrada' : 'câmera indisponível';
+    }
+  }
+  function fechar() {
+    if (stream) { stream.getTracks().forEach(t => t.stop()); stream = null; }
+    if (video) video.srcObject = null;
+    estadoCam = 'parado';
+  }
+  return {
+    alternarCamera() { usandoTras = !usandoTras; if (estadoCam === 'ligado' || estadoCam === 'abrindo') { fechar(); abrir(); } },
+    entrar() { t0 = tempo; abrir(); },
+    sair() { fechar(); },
+    redim() {},
+    desenhar(dt) {
+      const t = tempo, n = P.nivel, S = Math.min(L, A);
+      g.fillStyle = '#04070e'; g.fillRect(0, 0, L, A);
+      // imagem da câmera (cobre a tela)
+      if (estadoCam === 'ligado' && video && video.videoWidth) {
+        const vw = video.videoWidth, vh = video.videoHeight;
+        const escala = Math.max(L / vw, A / vh), dw = vw * escala, dh = vh * escala;
+        g.save();
+        if (!usandoTras) { g.translate(L, 0); g.scale(-1, 1); } // espelha a câmera frontal
+        g.globalAlpha = 1; g.drawImage(video, (L - dw) / 2, (A - dh) / 2, dw, dh);
+        g.restore();
+        // leve tom ciano por cima
+        g.fillStyle = `rgba(20,60,90,${.18 + .12 * Math.sin(t * .5)})`; g.fillRect(0, 0, L, A);
+      }
+      const CX = L / 2, CY = A * .45;
+      g.globalCompositeOperation = 'lighter';
+      // linha de varredura descendo
+      const sy = (t * .22 % 1) * A;
+      const lg = g.createLinearGradient(0, sy - 40, 0, sy + 40);
+      lg.addColorStop(0, 'rgba(95,230,255,0)'); lg.addColorStop(.5, `rgba(95,230,255,${.25 + n * .3})`); lg.addColorStop(1, 'rgba(95,230,255,0)');
+      g.fillStyle = lg; g.fillRect(0, sy - 40, L, 80);
+      // grade sutil
+      g.strokeStyle = 'rgba(95,230,255,.06)'; g.lineWidth = 1; g.beginPath();
+      for (let x = 0; x <= L; x += S * .1) { g.moveTo(x, 0); g.lineTo(x, A); }
+      for (let y = 0; y <= A; y += S * .1) { g.moveTo(0, y); g.lineTo(L, y); }
+      g.stroke();
+      // cantos (brackets)
+      const m = S * .08, bl = S * .05;
+      g.strokeStyle = `rgba(95,230,255,${.6 + n * .3})`; g.lineWidth = 2;
+      for (const [sx, sgy] of [[1, 1], [-1, 1], [1, -1], [-1, -1]]) {
+        const x = sx > 0 ? m : L - m, y = sgy > 0 ? m + (L < 640 ? 70 : 0) : A - m - (L < 640 ? 90 : 0);
+        g.beginPath();
+        g.moveTo(x + sx * bl, y); g.lineTo(x, y); g.lineTo(x, y + sgy * bl); g.stroke();
+      }
+      // retículo central + anéis de HUD
+      anelHUD(CX, CY, S * .78, t, n, 1, '95,230,255');
+      g.strokeStyle = `rgba(95,230,255,${.5 + n * .4})`; g.lineWidth = 1.4;
+      g.beginPath(); g.moveTo(CX - S * .04, CY); g.lineTo(CX + S * .04, CY);
+      g.moveTo(CX, CY - S * .04); g.lineTo(CX, CY + S * .04); g.stroke();
+      g.globalCompositeOperation = 'source-over';
+      // textos de HUD
+      g.fillStyle = 'rgb(95,230,255)';
+      g.font = `${Math.max(10, Math.round(S * .018))}px ui-monospace, Consolas, monospace`;
+      g.textAlign = 'left';
+      const et = { espera: 'VISÃO ATIVA', ouvindo: 'OUVINDO', pensando: 'ANALISANDO AMBIENTE', falando: 'FALANDO' }[P.estado] || 'VISÃO';
+      g.fillText(et + '   ·   SCANNER ÓPTICO', m, A < 700 ? A - m - 60 : A - m);
+      if (estadoCam !== 'ligado') {
+        g.textAlign = 'center';
+        g.font = `${Math.max(13, Math.round(S * .028))}px 'Rajdhani', sans-serif`;
+        g.fillStyle = estadoCam === 'erro' ? '#ff9a9a' : 'rgba(95,230,255,.85)';
+        g.fillText(estadoCam === 'erro' ? erro.toUpperCase() : 'INICIANDO CÂMERA…', CX, CY + S * .18);
+        g.textAlign = 'left';
+      }
+    }
+  };
+})();
+
+const MODOS = { nucleo, holograma, tempestade, esfera, camera };
+const CICLO = ['nucleo', 'holograma', 'tempestade', 'esfera'];
+const sujos = new Set();
+
+function redimensionar() {
+  DPR = Math.min(window.devicePixelRatio || 1, celular ? 1.5 : 2);
+  L = innerWidth; A = innerHeight;
+  tela.width = L * DPR; tela.height = A * DPR;
+  for (const k in MODOS) sujos.add(k);
+  if (modo) { modo.redim(); sujos.delete(nomeModo); }
+}
+
+function quadro(agora) {
+  const dt = Math.min(.05, (agora - ultimo) / 1000); ultimo = agora;
+  tempo += dt;
+  for (const k in alvo) P[k] += (alvo[k] - P[k]) * Math.min(1, dt * 3);
+  const n = lerNivel();
+  P.nivel += (n - P.nivel) * Math.min(1, dt * (n > P.nivel ? 18 : 6));
+  g.setTransform(DPR, 0, 0, DPR, 0, 0);
+  g.globalAlpha = 1; g.globalCompositeOperation = 'source-over';
+  try { modo && modo.desenhar(dt); } catch (e) { console.error(e); }
+  requestAnimationFrame(quadro);
+}
+
+window.Visual = {
+  modos: CICLO,
+  iniciar(canvas, fnNivel) {
+    tela = canvas; g = canvas.getContext('2d'); lerNivel = fnNivel || lerNivel;
+    redimensionar();
+    let espera; addEventListener('resize', () => { clearTimeout(espera); espera = setTimeout(redimensionar, 150); });
+    requestAnimationFrame(quadro);
+  },
+  estado(e) { P.estado = e; Object.assign(alvo, TABELA[e] || TABELA.espera); },
+  modo(nome) {
+    if (!MODOS[nome]) nome = 'holograma';
+    if (modo && modo !== MODOS[nome] && modo.sair) modo.sair();
+    nomeModo = nome; modo = MODOS[nome];
+    if (sujos.has(nome)) { modo.redim(); sujos.delete(nome); }
+    modo.entrar();
+    document.body.dataset.modo = nome === 'camera' ? 'holograma' : nome;
+    return nome;
+  },
+  alternarCamera() { if (nomeModo === 'camera') camera.alternarCamera(); },
+  atual: () => nomeModo
+};
+})();
+
+
+
+######################################################################
+### ARQUIVO: public/casa.html
+######################################################################
+
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="theme-color" content="#081226">
+<title>J.A.R.V.I.S. — Casa</title>
+<link href="https://fonts.googleapis.com/css2?family=Rajdhani:wght@500;600&family=Inter:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  :root { --az:#7db8ff; --az2:#4d9bff; --fr:rgba(125,184,255,.4); --ln:rgba(125,184,255,.18); --tx:#eaf3ff; }
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body { background:radial-gradient(ellipse at 50% 0%, #10224a, #081226 60%, #040913); color:var(--tx); font-family:'Inter',system-ui,sans-serif; min-height:100vh; padding:max(18px,env(safe-area-inset-top)) 16px 40px; }
+  .topo { display:flex; align-items:center; gap:14px; margin-bottom:6px; }
+  a.voltar { color:var(--az); text-decoration:none; border:1px solid var(--fr); border-radius:30px; padding:7px 14px; font-family:'Rajdhani'; letter-spacing:.1em; font-size:13px; }
+  h1 { font-family:'Rajdhani'; font-weight:600; letter-spacing:.25em; color:var(--az); font-size:19px; }
+  .sub { color:var(--fr); font-size:13px; margin:4px 0 20px; line-height:1.5; }
+  .cartao { background:rgba(10,22,46,.6); border:1px solid var(--ln); border-radius:14px; padding:14px; margin-bottom:12px; }
+  .lin { display:flex; gap:8px; flex-wrap:wrap; align-items:center; }
+  label { display:block; font-size:12px; color:var(--fr); letter-spacing:.08em; margin:10px 0 4px; text-transform:uppercase; }
+  input, select { width:100%; background:rgba(6,16,36,.85); border:1px solid var(--fr); color:var(--tx); font:14px 'Inter'; padding:11px 12px; border-radius:9px; outline:none; }
+  input::placeholder { color:rgba(125,184,255,.4); }
+  .col { flex:1 1 220px; min-width:0; }
+  button { font-family:'Rajdhani'; letter-spacing:.1em; border-radius:9px; cursor:pointer; border:1px solid var(--fr); background:rgba(77,155,255,.14); color:var(--az); padding:10px 14px; font-size:13px; }
+  button.prim { background:var(--az2); color:#02101f; border-color:var(--az2); font-weight:600; }
+  button.rem { border-color:rgba(255,120,120,.5); color:#ff9a9a; background:rgba(255,80,80,.08); }
+  .acoes { display:flex; gap:8px; flex-wrap:wrap; margin-top:12px; }
+  .barra { display:flex; gap:10px; align-items:center; margin:22px 0 10px; }
+  .barra h2 { font-family:'Rajdhani'; font-weight:600; letter-spacing:.15em; font-size:15px; color:var(--az); }
+  .aviso { background:rgba(255,200,80,.08); border:1px solid rgba(255,200,80,.3); color:#ffe0a0; border-radius:10px; padding:12px; font-size:13px; line-height:1.5; margin-bottom:16px; }
+  details { background:rgba(10,22,46,.5); border:1px solid var(--ln); border-radius:12px; padding:12px 14px; margin-top:14px; }
+  summary { cursor:pointer; color:var(--az); font-family:'Rajdhani'; letter-spacing:.1em; }
+  code { background:rgba(0,0,0,.4); padding:2px 6px; border-radius:5px; color:#bcd8ff; font-size:12px; word-break:break-all; }
+  pre { background:rgba(0,0,0,.45); border:1px solid var(--ln); border-radius:9px; padding:12px; overflow:auto; font-size:12px; color:#bcd8ff; margin-top:8px; }
+  #msg { position:fixed; left:50%; bottom:24px; transform:translateX(-50%); background:var(--az2); color:#02101f; font-family:'Rajdhani'; letter-spacing:.1em; padding:12px 22px; border-radius:30px; opacity:0; transition:.3s; pointer-events:none; }
+  #msg.ver { opacity:1; }
+  .tag { font-size:11px; color:var(--fr); }
+</style>
+</head>
+<body>
+<div class="topo"><a class="voltar" href="./">‹ VOLTAR</a><h1>CASA INTELIGENTE</h1></div>
+<p class="sub">Cadastre seus aparelhos e o Jarvis liga e desliga por voz: <em>"liga a luz da sala"</em>, <em>"desliga a TV"</em>, <em>"liga tudo"</em>.</p>
+
+<div class="aviso">
+  O Jarvis não fala direto com a lâmpada. Ele dispara um <b>link (webhook)</b> que o seu app de casa inteligente oferece.
+  No seu app (Smart Life/Tuya, SmartThings, IFTTT, Alexa, Home Assistant…) crie uma automação/cena "ligar" e outra "desligar",
+  copie o link de cada uma e cole aqui. Se usa <b>Home Assistant</b>, dá pra usar o modo HA mais abaixo.
+</div>
+
+<div class="barra"><h2>Aparelhos</h2></div>
+<div id="lista"></div>
+<button class="prim" id="add">+ Adicionar aparelho</button>
+
+<details>
+  <summary>Usar Home Assistant (opcional)</summary>
+  <label>Endereço do Home Assistant (precisa estar acessível pela internet, ex.: Nabu Casa)</label>
+  <input id="haUrl" placeholder="https://xxxx.ui.nabu.casa">
+  <label>Token de acesso (Long-Lived Access Token)</label>
+  <input id="haToken" type="password" placeholder="cole o token aqui">
+  <p class="tag" style="margin-top:8px">Nos aparelhos do tipo "Home Assistant", preencha a <b>entidade</b> (ex.: <code>light.sala</code>, <code>media_player.tv</code>).</p>
+</details>
+
+<div class="acoes">
+  <button class="prim" id="salvar">💾 Salvar tudo</button>
+  <button id="exportar">Copiar para o Render (nuvem)</button>
+</div>
+
+<details id="boxEnv" style="display:none">
+  <summary>CASA_JSON — cole isto no Render para a config não se perder</summary>
+  <p class="tag">Render → seu serviço → Environment → Add Variable → nome <code>CASA_JSON</code> → valor abaixo.</p>
+  <pre id="env"></pre>
+</details>
+
+<div id="msg"></div>
+
+<template id="tpl">
+  <div class="cartao disp">
+    <div class="lin">
+      <div class="col"><label>Nome (como você vai falar)</label><input class="nome" placeholder="luz da sala"></div>
+      <div class="col" style="flex:0 0 160px"><label>Tipo</label>
+        <select class="tipo"><option value="webhook">Link (webhook)</option><option value="ha">Home Assistant</option></select>
+      </div>
+    </div>
+    <div class="campos-webhook">
+      <div class="lin">
+        <div class="col"><label>Link para LIGAR</label><input class="ligar" placeholder="https://..."></div>
+        <div class="col"><label>Link para DESLIGAR</label><input class="desligar" placeholder="https://..."></div>
+        <div class="col" style="flex:0 0 120px"><label>Método</label><select class="metodo"><option>POST</option><option>GET</option></select></div>
+      </div>
+    </div>
+    <div class="campos-ha" style="display:none">
+      <label>Entidade do Home Assistant</label><input class="entidade" placeholder="light.sala">
+    </div>
+    <div class="acoes">
+      <button class="testarL">▶ Testar ligar</button>
+      <button class="testarD">▶ Testar desligar</button>
+      <button class="rem">Remover</button>
+    </div>
+  </div>
+</template>
+
+<script>
+const $ = s => document.querySelector(s);
+const lista = $('#lista'), tpl = $('#tpl');
+function msg(t){ const m=$('#msg'); m.textContent=t; m.classList.add('ver'); clearTimeout(m._t); m._t=setTimeout(()=>m.classList.remove('ver'),2200); }
+
+function novoCartao(d={}) {
+  const no = tpl.content.cloneNode(true);
+  const el = no.querySelector('.disp');
+  el.querySelector('.nome').value = d.nome||'';
+  el.querySelector('.tipo').value = d.tipo||'webhook';
+  el.querySelector('.ligar').value = d.ligar||'';
+  el.querySelector('.desligar').value = d.desligar||'';
+  el.querySelector('.metodo').value = d.metodo||'POST';
+  el.querySelector('.entidade').value = d.entidade||'';
+  const mostrar = () => {
+    const ha = el.querySelector('.tipo').value === 'ha';
+    el.querySelector('.campos-ha').style.display = ha?'block':'none';
+    el.querySelector('.campos-webhook').style.display = ha?'none':'block';
+  };
+  el.querySelector('.tipo').onchange = mostrar; mostrar();
+  el.querySelector('.rem').onclick = () => el.remove();
+  el.querySelector('.testarL').onclick = () => testar(el,'ligar');
+  el.querySelector('.testarD').onclick = () => testar(el,'desligar');
+  lista.appendChild(no);
+}
+function coletar() {
+  const dispositivos = [...document.querySelectorAll('.disp')].map(el => ({
+    nome: el.querySelector('.nome').value.trim(),
+    tipo: el.querySelector('.tipo').value,
+    ligar: el.querySelector('.ligar').value.trim(),
+    desligar: el.querySelector('.desligar').value.trim(),
+    metodo: el.querySelector('.metodo').value,
+    entidade: el.querySelector('.entidade').value.trim()
+  })).filter(d => d.nome);
+  return { dispositivos, ha: { url: $('#haUrl').value.trim(), token: $('#haToken').value.trim() } };
+}
+async function salvar() {
+  const r = await fetch('/api/casa', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(coletar()) });
+  const d = await r.json();
+  if (d.ok) msg('Salvo! O Jarvis já obedece.'); else msg('Erro ao salvar');
+}
+async function testar(el, acao) {
+  // salva antes para o servidor ter o aparelho
+  await fetch('/api/casa', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(coletar()) });
+  const nome = el.querySelector('.nome').value.trim();
+  if (!nome) return msg('Dê um nome ao aparelho');
+  const r = await fetch('/api/casa/testar', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ acao, alvo: nome }) });
+  const d = await r.json();
+  msg(d.ok ? `OK: ${acao} ${nome}` : `Falhou: ${d.falhas?.[0]?.erro || d.motivo || 'erro'}`);
+}
+$('#add').onclick = () => novoCartao();
+$('#salvar').onclick = salvar;
+$('#exportar').onclick = () => { $('#boxEnv').style.display='block'; $('#boxEnv').open=true; $('#env').textContent = JSON.stringify(coletar()); msg('Copie o texto e cole no Render'); };
+
+(async () => {
+  try {
+    const d = await (await fetch('/api/casa')).json();
+    $('#haUrl').value = d.ha?.url || '';
+    (d.dispositivos||[]).forEach(novoCartao);
+  } catch {}
+  if (!lista.children.length) novoCartao({ nome:'luz da sala' });
+})();
+</script>
+</body>
+</html>
+
+
+
+######################################################################
+### ARQUIVO: public/sw.js
+######################################################################
+
+// Service worker do J.A.R.V.I.S. — deixa o app abrir rápido no celular,
+// mesmo enquanto o servidor da nuvem acorda. NUNCA guarda respostas de /api.
+const CACHE = 'jarvis-v7';
+const SHELL = [
+  './', 'cerebro.html', 'visuais.js', 'casa.html',
+  'icone-192.png', 'icone-512.png', 'icone-maskable.png', 'apple-touch-icon.png',
+  'manifest.webmanifest'
+];
+
+self.addEventListener('install', e => {
+  e.waitUntil(caches.open(CACHE).then(c => c.addAll(SHELL)).then(() => self.skipWaiting()).catch(() => {}));
+});
+
+self.addEventListener('activate', e => {
+  e.waitUntil(caches.keys().then(ks => Promise.all(ks.filter(k => k !== CACHE).map(k => caches.delete(k)))).then(() => self.clients.claim()));
+});
+
+self.addEventListener('fetch', e => {
+  const req = e.request;
+  if (req.method !== 'GET') return;
+  const url = new URL(req.url);
+  // dados ao vivo e outras origens: sempre pela rede, sem cache
+  if (url.origin !== location.origin || url.pathname.includes('/api/')) return;
+  // app: responde do cache e atualiza por trás (stale-while-revalidate)
+  e.respondWith(
+    caches.open(CACHE).then(async cache => {
+      const cacheado = await cache.match(req, { ignoreSearch: true });
+      const rede = fetch(req).then(resp => {
+        if (resp && resp.status === 200 && resp.type === 'basic') cache.put(req, resp.clone());
+        return resp;
+      }).catch(() => cacheado);
+      return cacheado || rede;
+    })
+  );
+});
+
+
+
+######################################################################
+### ARQUIVO: public/manifest.webmanifest
+######################################################################
+
+{
+  "name": "J.A.R.V.I.S.",
+  "short_name": "JARVIS",
+  "description": "Assistente pessoal de voz com interfaces holográficas.",
+  "lang": "pt-BR",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#04070e",
+  "theme_color": "#02050b",
+  "categories": ["productivity", "utilities"],
+  "icons": [
+    { "src": "icone-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "icone-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "icone-maskable.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}

@@ -1,4 +1,3 @@
-
 // ════════════════════════════════════════════════════════════════
 //  J.A.R.V.I.S. — VISUAIS
 //  3 interfaces que reagem à voz:
@@ -714,12 +713,12 @@ const nucleo = (() => {
   const CI = '95,215,255', CI2 = '150,235,255', OU = '255,200,120', BR = '235,250,255';
   // anéis concêntricos girando
   const aneis = [
-    { r: 1.00, vel: .06, seg: 0, larg: 1.2, a: .18 },
-    { r: 0.92, vel: -.18, seg: 20, larg: 2.2, a: .5 },
-    { r: 0.82, vel: .28, seg: 4, larg: 3, a: .6, arco: Math.PI * .42 },
-    { r: 0.70, vel: -.12, seg: 60, larg: 1, a: .3 },
-    { r: 0.58, vel: .5, seg: 3, larg: 2.4, a: .55, arco: Math.PI * .5 },
-    { r: 0.30, vel: -.7, seg: 6, larg: 2, a: .5 }
+    { r: 1.06, vel: .05, seg: 0, larg: 1.4, a: .22 },
+    { r: 0.98, vel: -.16, seg: 24, larg: 2.6, a: .6 },
+    { r: 0.88, vel: .26, seg: 4, larg: 4.5, a: .8, arco: Math.PI * .42, ouro: true },
+    { r: 0.78, vel: -.1, seg: 72, larg: 1.2, a: .38 },
+    { r: 0.66, vel: .45, seg: 3, larg: 3.4, a: .75, arco: Math.PI * .5 },
+    { r: 0.30, vel: -.7, seg: 6, larg: 2.4, a: .6 }
   ];
   const orbes = Array.from({ length: 10 }, (_, i) => ({ r: .6 + Math.random() * .5, a0: Math.random() * 6.28, vel: (.15 + Math.random() * .4) * (i % 2 ? -1 : 1), tam: 1.2 + Math.random() * 1.8 }));
   const poeira = Array.from({ length: celular ? 50 : 100 }, () => ({ x: Math.random(), y: Math.random(), v: rnd(.002, .01), a: Math.random() * .4 }));
@@ -743,7 +742,7 @@ const nucleo = (() => {
     desenhar(dt) {
       const t = tempo, n = P.nivel, S = Math.min(L, A);
       const CX = L / 2, CY = A * (L < 640 ? .42 : .45);
-      const R = S * (celular ? .32 : .28) * (1 + n * .05);
+      const R = S * (celular ? .34 : .30) * (1 + n * .06);
       if (Math.random() < dt * .6) gerarLeituras();
       // fundo
       const bg = g.createRadialGradient(CX, CY, 0, CX, CY, Math.max(L, A) * .7);
@@ -767,7 +766,9 @@ const nucleo = (() => {
         if (an.arco) {
           for (let k = 0; k < an.seg; k++) {
             const a = ang + k * (Math.PI * 2 / an.seg);
-            arco(CX, CY, raio, a, a + an.arco, an.larg, k % 2 ? OU : CI2, an.a * forca);
+            const cor = an.ouro ? OU : (k % 2 ? OU : CI2);
+            arco(CX, CY, raio, a, a + an.arco, an.larg, cor, an.a * forca);
+            if (an.ouro) arco(CX, CY, raio, a, a + an.arco, an.larg * 2.4, OU, an.a * forca * .25); // brilho
           }
         } else {
           g.globalAlpha = an.a * forca * .8; g.strokeStyle = `rgb(${CI})`; g.lineWidth = an.larg; g.beginPath();
@@ -804,37 +805,70 @@ const nucleo = (() => {
         g.globalAlpha = .15; g.fillRect(x - o.tam * 1.5, y - o.tam * 1.5, o.tam * 3, o.tam * 3);
       }
 
-      // REATOR central (triângulo de arco)
-      const rc = R * .26;
-      g.lineWidth = 2.4; g.globalAlpha = .9; g.strokeStyle = `rgb(${CI2})`;
-      for (let k = 0; k < 3; k++) {
-        const a = -Math.PI / 2 + k * (Math.PI * 2 / 3) + t * .2;
-        const a2 = a + Math.PI * 2 / 3;
-        g.beginPath();
-        g.arc(CX, CY, rc, a + .18, a2 - .18); g.stroke();
-        // bobinas (raios internos)
-        g.globalAlpha = .5;
-        const mx = CX + Math.cos((a + a2) / 2) * rc, my = CY + Math.sin((a + a2) / 2) * rc;
-        g.beginPath(); g.moveTo(CX, CY); g.lineTo(mx, my); g.stroke();
-        g.globalAlpha = .9;
+      // ░░ NÚCLEO NEURAL ░░ íris de lâminas + órbitas de luz 3D + plasma (original, IA do futuro)
+      const rc = R * .4;
+      const pulso = 1 + n * .5 + .06 * Math.sin(t * 3);
+      const VIO = '150,190,255'; // iridescência fria
+      // íris de lâminas — 3 anéis de arcos curtos em contra-rotação (abrem com a voz)
+      for (let camada = 0; camada < 3; camada++) {
+        const raioL = rc * (1.04 + camada * .3);
+        const N = 10 + camada * 4;
+        const giro = t * (.5 - camada * .12) * (camada % 2 ? -1 : 1);
+        const vao = (Math.PI * 2 / N) * (.28 + n * .22 - camada * .03);
+        g.lineWidth = 3.4 - camada * .8; g.strokeStyle = `rgb(${camada === 1 ? VIO : CI})`;
+        for (let k = 0; k < N; k++) {
+          const a = giro + k * (Math.PI * 2 / N);
+          g.globalAlpha = (.78 - camada * .14) * forca;
+          g.beginPath(); g.arc(CX, CY, raioL, a, a + vao); g.stroke();
+        }
       }
-      // núcleo branco
-      const pulso = 1 + n * .4 + .06 * Math.sin(t * 3);
-      const nc = g.createRadialGradient(CX, CY, 0, CX, CY, rc * .85 * pulso);
-      nc.addColorStop(0, `rgba(255,255,255,${.95 * forca})`);
-      nc.addColorStop(.4, `rgba(${CI2},${.7 * forca})`);
-      nc.addColorStop(1, `rgba(${CI},0)`);
-      g.globalAlpha = 1; g.fillStyle = nc; g.fillRect(CX - rc, CY - rc, rc * 2, rc * 2);
+      // órbitas de luz em 3D (giroscópio) — assinatura: trilho brilhante + partículas com rastro
+      for (let o = 0; o < 3; o++) {
+        const rot = o * (Math.PI / 3) + t * (.35 + o * .12);
+        const rx = rc * (1.55 + o * .12);
+        const ry = rx * (.18 + .8 * Math.abs(Math.cos(Math.sin(t * (.4 + o * .15) + o) * 1.2)));
+        const cor = o === 1 ? VIO : CI2;
+        const ponto = ang => [CX + rx * Math.cos(ang) * Math.cos(rot) - ry * Math.sin(ang) * Math.sin(rot),
+                              CY + rx * Math.cos(ang) * Math.sin(rot) + ry * Math.sin(ang) * Math.cos(rot)];
+        // trilho: brilho largo por baixo + linha nítida por cima
+        g.strokeStyle = `rgb(${cor})`;
+        g.globalAlpha = (.16 + n * .2) * forca; g.lineWidth = 6.5;
+        g.beginPath(); g.ellipse(CX, CY, rx, ry, rot, 0, Math.PI * 2); g.stroke();
+        g.globalAlpha = (.6 + n * .35) * forca; g.lineWidth = 2.6;
+        g.beginPath(); g.ellipse(CX, CY, rx, ry, rot, 0, Math.PI * 2); g.stroke();
+        // 2 partículas de luz correndo, cada uma com rastro
+        const vel = 1.1 + o * .5;
+        for (let p = 0; p < 2; p++) {
+          const base = t * vel + p * Math.PI;
+          for (let tr = 6; tr >= 0; tr--) {
+            const [x, y] = ponto(base - tr * .085);
+            const a = 1 - tr / 7;
+            g.globalAlpha = a * a * forca; g.fillStyle = tr ? `rgb(${cor})` : '#f4ffff';
+            const s = tr ? 2.4 * a : 3.6;
+            g.fillRect(x - s / 2, y - s / 2, s, s);
+          }
+          const [hx, hy] = ponto(base);
+          g.globalAlpha = .28 * forca; g.fillStyle = '#eaffff'; g.fillRect(hx - 7, hy - 7, 14, 14);
+        }
+      }
+      // plasma central que respira (branco-azulado)
+      const halo = g.createRadialGradient(CX, CY, 0, CX, CY, rc * 1.15 * pulso);
+      halo.addColorStop(0, `rgba(255,255,255,${forca})`);
+      halo.addColorStop(.3, `rgba(200,244,255,${.85 * forca})`);
+      halo.addColorStop(.6, `rgba(${CI2},${.45 * forca})`);
+      halo.addColorStop(.85, `rgba(${VIO},${.2 * forca})`);
+      halo.addColorStop(1, `rgba(${CI},0)`);
+      g.globalAlpha = 1; g.fillStyle = halo; g.fillRect(CX - rc * 1.3, CY - rc * 1.3, rc * 2.6, rc * 2.6);
       g.fillStyle = `rgba(255,255,255,${forca})`;
-      g.beginPath(); g.arc(CX, CY, rc * .34 * pulso, 0, Math.PI * 2); g.fill();
+      g.beginPath(); g.arc(CX, CY, rc * .3 * pulso, 0, Math.PI * 2); g.fill();
 
       g.globalCompositeOperation = 'source-over';
       // leituras de dados
       g.globalAlpha = .7; g.fillStyle = `rgb(${CI})`;
       g.font = `${Math.max(9, Math.round(S * .015))}px ui-monospace, Consolas, monospace`;
       const et = { espera: 'STANDBY', ouvindo: 'OUVINDO', pensando: 'PROCESSANDO', falando: 'FALANDO' }[P.estado] || 'STANDBY';
-      g.textAlign = 'left'; g.fillText(`REATOR · ${et}`, CX - R, CY - R - S * .03);
-      g.textAlign = 'right'; g.fillText(`NÚCLEO ${Math.round((.4 + n * .6) * 100)}%`, CX + R, CY - R - S * .03);
+      g.textAlign = 'left'; g.fillText(`NÚCLEO · ${et}`, CX - R, CY - R - S * .03);
+      g.textAlign = 'right'; g.fillText(`NEURAL ${Math.round((.4 + n * .6) * 100)}%`, CX + R, CY - R - S * .03);
       if (L >= 640) { g.globalAlpha = .4; g.textAlign = 'left'; leituras.forEach((l, i) => g.fillText(l, CX + R + S * .01, CY - R * .3 + i * S * .022)); }
       g.textAlign = 'left'; g.globalAlpha = 1;
     }

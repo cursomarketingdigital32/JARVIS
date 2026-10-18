@@ -1,4 +1,3 @@
-
 // ═══════════════════════════════════════════════════════════════
 //  FERRAMENTAS DO J.A.R.V.I.S. — dados em tempo real, sem chave
 //  clima (Open-Meteo) · cotações (AwesomeAPI) · notícias (Google
@@ -23,7 +22,7 @@ const CODIGOS = {
 };
 const cacheGeo = new Map();
 export async function clima(cidade) {
-  cidade = String(cidade || '').trim() || process.env.CIDADE_PADRAO || 'São José dos Campos';
+  cidade = String(cidade || '').trim() || process.env.CIDADE_PADRAO || 'Maceió';
   let geo = cacheGeo.get(cidade.toLowerCase());
   if (!geo) {
     const g = await pegar(`https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(cidade)}&count=1&language=pt&format=json`);
