@@ -677,6 +677,15 @@ app.get('/api/sistema', (req, res) => {
 // ═══════════════════════════════════════════════════════════════
 //  STATUS
 // ═══════════════════════════════════════════════════════════════
+// Diagnóstico temporário da ferramenta de clima (mostra o erro cru)
+app.get('/api/diagnostico', async (req, res) => {
+  try {
+    const r = await executarFerramenta({ nome: 'clima', cidade: 'São José dos Campos' });
+    res.json({ ok: true, resultado: r });
+  } catch (e) {
+    res.json({ ok: false, erro: String(e && e.message || e) });
+  }
+});
 app.get('/api/health', (req, res) => {
   const cerebros = cerebrosDisponiveis().map(c => c.nome);
   res.json({
