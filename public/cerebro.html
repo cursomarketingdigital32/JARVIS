@@ -491,6 +491,18 @@ function urlDaAcao(a) {
   if (a.url) return a.url;
   return null;
 }
+// Aba "visor" persistente: aberta no gesto do usuário (toque/Enter) para que o
+// navegador não bloqueie como popup; as próximas aberturas só navegam nela,
+// sem roubar o foco do painel e sem overlays de erro.
+let abaViewer = null;
+function garantirViewer() {
+  try {
+    if (!abaViewer || abaViewer.closed) {
+      abaViewer = window.open('about:blank', '_blank');
+      if (abaViewer) { try { abaViewer.document.title = 'Jarvis'; } catch {} window.focus(); }
+    }
+  } catch {}
+}
 async function executarAcao(a) {
   if (!a || typeof a !== 'object') return;
   if (a.tipo === 'interface') return trocarModo(a.modo);
@@ -511,8 +523,13 @@ async function executarAcao(a) {
     } catch {}
   }
   if (url) {
-    const w = window.open(url, '_blank', 'noopener');
-    if (!w) { el.linkA.href = url; el.linkA.textContent = 'TOQUE PARA ABRIR ↗'; el.link.style.display = 'block'; }
+    let ok = false;
+    try { if (abaViewer && !abaViewer.closed) { abaViewer.location.href = url; ok = true; } } catch {}
+    if (!ok) {
+      const w = window.open(url, '_blank', 'noopener');
+      if (w) { ok = true; try { abaViewer = w; } catch {} }
+    }
+    if (!ok) legendaVoce('não consegui abrir a aba sozinho');
   } else if (a.tipo === 'abrir_app' || a.tipo === 'sistema') {
     legendaVoce('isso só funciona com o Jarvis rodando no seu computador');
   }
@@ -622,6 +639,7 @@ function atualizarMudo() {
 atualizarMudo();
 
 el.mic.onclick = () => {
+  garantirViewer();
   if (audioAtual) { audioAtual.pause(); audioAtual.onended?.(); }
   ativo ? desligar() : ligar();
 };
@@ -641,6 +659,7 @@ el.teclado.onclick = () => {
 };
 el.form.onsubmit = (e) => {
   e.preventDefault();
+  garantirViewer();
   const t = el.campo.value.trim();
   if (!t) return;
   garantirAudio();
