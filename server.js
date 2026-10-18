@@ -273,12 +273,10 @@ async function chatClaude(chave, modelo, msgs) {
 function cerebrosDisponiveis() {
   const lista = [];
   if (process.env.GROQ_API_KEY) lista.push({ nome: 'groq', fn: chatGroq });
-  if (process.env.GEMINI_API_KEY) lista.push({ nome: 'gemini', fn: m => chatGemini(process.env.GEMINI_API_KEY, process.env.GEMINI_MODELO || 'gemini-3.8-flash', m) });
   if (process.env.ANTHROPIC_API_KEY) lista.push({ nome: 'claude', fn: m => chatClaude(process.env.ANTHROPIC_API_KEY, process.env.CLAUDE_MODELO || 'claude-3-5-sonnet-latest', m) });
   if (process.env.OPENAI_API_KEY) lista.push({ nome: 'openai', fn: m => chatEstiloOpenAI(process.env.OPENAI_URL || 'https://api.openai.com/v1/chat/completions', process.env.OPENAI_API_KEY, process.env.OPENAI_MODELO || 'gpt-4o-mini', m) });
-  // escolha do cérebro principal (CEREBRO_PRINCIPAL=gemini deixa o Gemini na frente)
-  // padrão: Gemini na frente quando a chave dele existir (mais inteligente); senão fica o Groq
-  const pref = (process.env.CEREBRO_PRINCIPAL || 'gemini').toLowerCase();
+  // Gemini removido a pedido do senhor (18/10/2026) — o Muse é o cérebro principal
+  const pref = (process.env.CEREBRO_PRINCIPAL || '').toLowerCase();
   if (pref) lista.sort((a, b) => (b.nome === pref) - (a.nome === pref));
   return lista;
 }
@@ -381,34 +379,25 @@ app.post('/api/chat', async (req, res) => {
   if (!cerebros.length) {
     if (rapida) return res.json({ ...rapida, cerebro: 'local' });
     return res.json({
-      fala: `${NOME_DONO[0].toUpperCase() + NOME_DONO.slice(1)}, meu cérebro está desligado. Configure a chave GEMINI_API_KEY (grátis em aistudio.google.com) ou GROQ_API_KEY para eu poder pensar.`,
+      fala: `${NOME_DONO[0].toUpperCase() + NOME_DONO.slice(1)}, meu cérebro está desligado. Configure a chave GROQ_API_KEY para eu poder pensar.`,
       acao: null, cerebro: 'nenhum', erro: 'sem_chave'
     });
   }
   const msgs = montarMensagens(texto, history);
   let ultimoErro = '';
-  const principal = cerebros[0];
-  if (principal) {
-    try {
-      return res.json(await usarCerebro(principal, msgs));
-    } catch (e) {
-      ultimoErro = `${principal.nome}: ${e.message}`;
-      log('❌', ultimoErro);
-    }
-  }
 
-  // 2) Muse, se estiver conectado lendo a fila
+  // 1) MUSE (eu, o Jarvis) — cérebro principal
   if (museOnline()) {
-    const r = await esperarMuse(enfileirar(texto), Number(process.env.MUSE_ESPERA_MS || 25000));
+    const r = await esperarMuse(enfileirar(texto), Number(process.env.MUSE_ESPERA_MS || 30000));
     if (r && r.response) {
       log('🧠 muse:', r.response);
       return res.json({ fala: r.response, acao: r.control || null, audio_url: r.audio_url || null, cerebro: 'muse' });
     }
-    log('⚠️  Muse não respondeu a tempo, tentando o próximo cérebro');
+    log('⚠️  Muse não respondeu a tempo, usando cérebro reserva rápido');
   }
 
-  // 3) demais cérebros em ordem, até um funcionar
-  for (const c of cerebros.slice(1)) {
+  // 2) cérebros reserva (rápidos) em ordem, até um funcionar — sem erro nunca
+  for (const c of cerebros) {
     try {
       return res.json(await usarCerebro(c, msgs));
     } catch (e) {
@@ -420,7 +409,7 @@ app.post('/api/chat', async (req, res) => {
   const det = ultimoErro || groqErro || '';
   const chaveRuim = /401|invalid|api key|unauthor|no api key/i.test(det);
   const falaErro = chaveRuim
-    ? `${NOME_DONO[0].toUpperCase() + NOME_DONO.slice(1)}, minha chave de acesso foi recusada. Confira a GEMINI_API_KEY ou a GROQ_API_KEY.`
+    ? `${NOME_DONO[0].toUpperCase() + NOME_DONO.slice(1)}, minha chave de acesso foi recusada. Confira a GROQ_API_KEY.`
     : `Desculpe, ${NOME_DONO}, meu cérebro não respondeu. Tente de novo em instantes.`;
   res.json({ fala: falaErro, acao: null, cerebro: 'erro', erro: chaveRuim ? 'chave_invalida' : 'falha', detalhe: det });
 });
@@ -720,7 +709,7 @@ app.get('/api/health', (req, res) => {
     onde: NA_NUVEM ? 'nuvem' : 'computador',
     dono: NOME_DONO,
     muse: { conectado: museOnline(), pedidos_na_fila: fila.size },
-    cerebro: (cerebros[0] || 'nenhum'),
+    cerebro: museOnline() ? 'muse' : (cerebros[0] || 'nenhum'),
     cerebros_reserva: cerebros,
     voz_piper: piperExiste(),
     voz_motor: vozMotor(),
