@@ -720,14 +720,9 @@ el.inicio.onclick = async () => {
   Visual.modo(Visual.atual()); // reapresenta a montagem
   garantirAudio();
   await lerSaude();
-  const h = new Date().getHours();
-  const saud = h < 5 ? 'Boa noite' : h < 12 ? 'Bom dia' : h < 18 ? 'Boa tarde' : 'Boa noite';
-  const dono = saude.dono || 'senhor';
   somInicio();
-  const p = await lerPainel();
-  const c = p?.clima;
-  const extra = c ? ` Em ${c.cidade.split(',')[0]}, ${c.agora.temperatura} graus e ${c.agora.condicao}.` : '';
-  await falar(`${saud}, ${dono}. Todos os sistemas estão online.${extra} Em que posso ajudar?`);
+  lerPainel(); // só atualiza o visual (clima/cotação no HUD); o clima só é FALADO se ele perguntar
+  await falar('Senhor, estou ativo.');
   ligar();
 };
 // ════════════════════════════════════════════════════════════════
