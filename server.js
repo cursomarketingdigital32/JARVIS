@@ -677,20 +677,6 @@ app.get('/api/sistema', (req, res) => {
 // ═══════════════════════════════════════════════════════════════
 //  STATUS
 // ═══════════════════════════════════════════════════════════════
-// Diagnóstico temporário das ferramentas (mostra o erro cru)
-app.get('/api/diagnostico', async (req, res) => {
-  const testes = {};
-  for (const t of [
-    ['clima', { nome: 'clima', cidade: 'São José dos Campos' }],
-    ['cotacao', { nome: 'cotacao', moedas: ['dolar'] }],
-    ['noticias', { nome: 'noticias', tema: '' }],
-    ['wikipedia', { nome: 'wikipedia', termo: 'Brasil' }]
-  ]) {
-    try { testes[t[0]] = await executarFerramenta(t[1]); }
-    catch (e) { testes[t[0]] = { erro: String(e && e.message || e) }; }
-  }
-  res.json({ ok: true, testes });
-});
 app.get('/api/health', (req, res) => {
   const cerebros = cerebrosDisponiveis().map(c => c.nome);
   res.json({
