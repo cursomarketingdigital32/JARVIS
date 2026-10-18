@@ -1,0 +1,15 @@
+services:
+  - type: web
+    name: jarvis
+    runtime: node
+    plan: free
+    buildCommand: npm install
+    startCommand: npm start
+    healthCheckPath: /api/health
+    envVars:
+      - key: GROQ_API_KEY
+        sync: false
+      - key: NOME_DONO
+        value: senhor
+      - key: CIDADE_PADRAO
+        value: Maceió

@@ -2,272 +2,894 @@
 <html lang="pt-BR">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>J.A.R.V.I.S. — Neural</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="theme-color" content="#081226">
+<title>J.A.R.V.I.S.</title>
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<link rel="icon" href="icone-192.png">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="JARVIS">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Rajdhani:wght@400;500;600&family=Inter:wght@300;400;500&display=swap" rel="stylesheet">
 <style>
-  * { margin: 0; padding: 0; box-sizing: border-box; }
+  :root {
+    --fundo: #081226;
+    --fundo-borda: #040913;
+    --azul: #7db8ff;
+    --azul-forte: #4d9bff;
+    --azul-fraco: rgba(125, 184, 255, .45);
+    --linha: rgba(125, 184, 255, .14);
+    --texto: #eaf3ff;
+    --perigo: #ff6b6b;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html, body { height: 100%; }
   body {
-    background: #000;
+    background: radial-gradient(ellipse at 50% 45%, #10224a 0%, var(--fundo) 45%, var(--fundo-borda) 100%);
+    color: var(--texto);
     overflow: hidden;
-    height: 100vh;
-    font-family: 'Segoe UI', sans-serif;
+    font-family: 'Inter', system-ui, sans-serif;
+    user-select: none;
   }
-  #brain {
-    position: fixed;
-    top: 0; left: 0;
-    width: 100%; height: 100%;
+  #esfera { position: fixed; inset: 0; width: 100%; height: 100%; display: block; }
+
+  /* ── HUD ─────────────────────────────── */
+  .hud { position: fixed; z-index: 5; font-family: 'Rajdhani', sans-serif; letter-spacing: .18em; text-transform: uppercase; color: var(--azul-fraco); font-size: 12px; line-height: 1.6; pointer-events: none; }
+  .hud b { color: var(--azul); font-weight: 600; }
+  #hudTL { top: max(18px, env(safe-area-inset-top)); left: 20px; }
+  #hudTR { top: max(18px, env(safe-area-inset-top)); right: 20px; text-align: right; }
+  #hudBL { bottom: max(22px, env(safe-area-inset-bottom)); left: 20px; }
+  .marca { font-size: 15px; color: var(--azul); letter-spacing: .5em; font-weight: 500; }
+  .barra { display: inline-block; width: 70px; height: 3px; background: var(--linha); vertical-align: middle; margin-left: 8px; position: relative; overflow: hidden; }
+  .barra i { position: absolute; left: 0; top: 0; bottom: 0; background: var(--azul); width: 0; transition: width .6s; }
+  #relogio { font-size: 22px; color: var(--azul); letter-spacing: .12em; }
+
+  #estado {
+    position: fixed; top: max(18px, env(safe-area-inset-top)); left: 50%; transform: translateX(-50%); z-index: 5;
+    font-family: 'Rajdhani', sans-serif; letter-spacing: .45em; font-size: 12px; color: var(--azul);
+    padding: 5px 4px 5px 16px; border-top: 1px solid var(--linha); border-bottom: 1px solid var(--linha);
+    pointer-events: none; white-space: nowrap;
   }
-  .ui {
-    position: fixed;
-    bottom: 30px;
-    left: 0; right: 0;
-    text-align: center;
-    z-index: 10;
+  #estado::before { content: ''; display: inline-block; width: 6px; height: 6px; border-radius: 50%; background: var(--azul); margin-right: 10px; vertical-align: 1px; box-shadow: 0 0 8px var(--azul); }
+  #estado.pulsa::before { animation: piscar 1s infinite; }
+  @keyframes piscar { 50% { opacity: .2; } }
+
+  /* ── Legendas ─────────────────────────── */
+  #legendas { position: fixed; left: 50%; transform: translateX(-50%); bottom: calc(118px + env(safe-area-inset-bottom)); width: min(760px, calc(100% - 32px)); text-align: center; z-index: 6; pointer-events: none; }
+  #legVoce { font-size: 13px; color: var(--azul-fraco); letter-spacing: .04em; min-height: 18px; margin-bottom: 8px; transition: opacity .4s; }
+  #legVoce.interim { font-style: italic; }
+  #legJarvis { font-size: clamp(17px, 2.3vw, 24px); font-weight: 500; color: var(--texto); text-shadow: 0 2px 14px rgba(0,0,0,.8); line-height: 1.35; min-height: 32px; }
+  #legJarvis.erro { color: #ffd0d0; font-size: 15px; }
+  #link { display: none; margin-top: 12px; pointer-events: auto; }
+  #link a { color: var(--azul); font-family: 'Rajdhani', sans-serif; letter-spacing: .2em; font-size: 13px; text-decoration: none; border: 1px solid var(--azul-fraco); padding: 7px 16px; display: inline-block; }
+
+  /* ── Controles (fileira de pontos como no vídeo) ── */
+  #controles { position: fixed; left: 50%; transform: translateX(-50%); bottom: max(24px, env(safe-area-inset-bottom)); display: flex; align-items: center; gap: 18px; z-index: 7; }
+  .ponto { width: 34px; height: 34px; border-radius: 50%; border: 1px solid var(--linha); background: rgba(10, 25, 55, .5); color: var(--azul-fraco); display: grid; place-items: center; cursor: pointer; transition: all .25s; }
+  .ponto:hover, .ponto.ativo { color: var(--azul); border-color: var(--azul-fraco); }
+  .ponto svg { width: 15px; height: 15px; }
+  .mini { width: 5px; height: 5px; border-radius: 50%; background: var(--azul-fraco); opacity: .6; }
+  #btnMic { width: 58px; height: 58px; border-color: var(--azul-fraco); color: var(--azul); }
+  #btnMic svg { width: 22px; height: 22px; }
+  #btnMic.ligado { background: rgba(77, 155, 255, .18); box-shadow: 0 0 0 0 rgba(77,155,255,.5); animation: anel 2s infinite; }
+  @keyframes anel { 0% { box-shadow: 0 0 0 0 rgba(77,155,255,.45); } 100% { box-shadow: 0 0 0 18px rgba(77,155,255,0); } }
+
+  #formTexto { position: fixed; left: 50%; transform: translateX(-50%); bottom: calc(96px + env(safe-area-inset-bottom)); width: min(560px, calc(100% - 32px)); z-index: 8; display: none; }
+  #formTexto.aberto { display: block; }
+  #formTexto input { width: 100%; background: rgba(6, 16, 36, .85); border: 1px solid var(--azul-fraco); color: var(--texto); font: 15px 'Inter', sans-serif; padding: 13px 16px; outline: none; }
+  #formTexto input::placeholder { color: var(--azul-fraco); }
+  body.digitando #legendas { bottom: calc(160px + env(safe-area-inset-bottom)); }
+
+  /* ── Tela inicial ─────────────────────── */
+  #inicio { position: fixed; inset: 0; z-index: 20; display: grid; place-items: center; cursor: pointer; background: rgba(4, 9, 19, .35); transition: opacity .8s; }
+  #inicio.some { opacity: 0; pointer-events: none; }
+  #inicio div { text-align: center; font-family: 'Rajdhani', sans-serif; margin-top: 52vh; }
+  #inicio h1 { font-weight: 500; font-size: 22px; letter-spacing: .9em; color: var(--azul); margin-right: -.9em; }
+  #inicio p { margin-top: 14px; font-size: 12px; letter-spacing: .4em; color: var(--azul-fraco); animation: piscar 2s infinite; }
+
+  @media (max-width: 640px) {
+    .hud { font-size: 10px; }
+    #hudBL { display: none; }
+    #hudCot { display: none; }
+    #controles { gap: 9px; }
+    .ponto { width: 30px; height: 30px; }
+    #btnMic { width: 52px; height: 52px; }
+    #relogio { font-size: 17px; }
+    .marca { font-size: 12px; letter-spacing: .35em; }
+    #estado { top: auto; bottom: calc(96px + env(safe-area-inset-bottom)); font-size: 10px; }
+    #legendas { bottom: calc(136px + env(safe-area-inset-bottom)); }
+    body.digitando #estado { display: none; }
   }
-  .title {
-    color: #4da6ff;
-    font-size: 1.2em;
-    letter-spacing: 0.8em;
-    text-shadow: 0 0 15px #4da6ff;
-    margin-bottom: 15px;
-    font-weight: 200;
+  /* ── Temas de cada interface ─────────── */
+  body[data-modo="nucleo"] { --azul:#8fd3ff; --azul-forte:#2fb8ff; --azul-fraco:rgba(143,211,255,.5); --linha:rgba(143,211,255,.16); background:#02060d; }
+  body[data-modo="holograma"] { --azul: #6fe3ff; --azul-forte: #22c8ff; --azul-fraco: rgba(111,227,255,.45); --linha: rgba(111,227,255,.16); background: #02050b; }
+  body[data-modo="tempestade"] { --azul: #e6b8ff; --azul-forte: #b45cff; --azul-fraco: rgba(230,184,255,.5); --linha: rgba(230,184,255,.18); background: #0b0216; }
+  body[data-modo="tempestade"] .ponto { background: rgba(40, 10, 60, .5); }
+  body[data-modo="holograma"] .ponto { background: rgba(4, 20, 30, .55); }
+
+  #hudClima, #hudCot { margin-top: 6px; color: var(--azul); }
+  #hudCot { color: var(--azul-fraco); }
+  #hudTimers div { margin-top: 6px; color: var(--azul); font-size: 13px; }
+  #hudTimers div.fim { animation: piscar .5s infinite; }
+  #hudTela div { margin-top: 6px; color: var(--azul); font-size: 13px; }
+
+  /* legenda palavra por palavra */
+  #legJarvis .w { opacity: .3; transition: opacity .12s; }
+  #legJarvis .w.dita { opacity: 1; }
+  #legJarvis.karaoke { font-weight: 600; font-size: clamp(19px, 2.6vw, 28px); }
+
+  #btnInstalar {
+    position: fixed; top: max(14px, env(safe-area-inset-top)); left: 50%; transform: translateX(-50%); z-index: 25;
+    display: none; background: rgba(77,155,255,.15); color: var(--azul); border: 1px solid var(--azul-fraco);
+    font-family: 'Rajdhani', sans-serif; letter-spacing: .18em; font-size: 12px; padding: 9px 18px; border-radius: 30px;
+    cursor: pointer; backdrop-filter: blur(6px);
   }
-  #btnMic {
-    width: 60px;
-    height: 60px;
-    border-radius: 50%;
-    border: 1px solid #4da6ff;
-    background: rgba(77, 166, 255, 0.05);
-    color: #4da6ff;
-    font-size: 1.5em;
-    cursor: pointer;
-    transition: all 0.3s;
-  }
-  #btnMic:hover { background: rgba(77, 166, 255, 0.2); box-shadow: 0 0 20px #4da6ff; }
-  #btnMic.on { background: rgba(77, 166, 255, 0.3); box-shadow: 0 0 30px #4da6ff; animation: pulse 1.5s infinite; }
-  @keyframes pulse { 0%,100% { transform: scale(1); } 50% { transform: scale(1.08); } }
-  #status {
-    color: #2a6db5;
-    font-size: 0.85em;
-    letter-spacing: 0.2em;
-    margin-top: 10px;
-    min-height: 20px;
-  }
+  #btnInstalar.mostra { display: block; }
+  @media (prefers-reduced-motion: reduce) { #btnMic.ligado { animation: none; } }
 </style>
 </head>
 <body>
-<canvas id="brain"></canvas>
-<div class="ui">
-  <div class="title">JARVIS</div>
-  <button id="btnMic">🎤</button>
-  <div id="status">toque para falar</div>
+<canvas id="esfera"></canvas>
+
+<div class="hud" id="hudTL">
+  <div class="marca">J.A.R.V.I.S.</div>
+  <div>Cérebro: <b id="hudCerebro">—</b></div>
+  <div>Voz: <b id="hudVoz">—</b></div>
+  <div>Ouvido: <b id="hudOuvido">—</b></div>
+</div>
+<div class="hud" id="hudTR">
+  <div id="relogio">--:--</div>
+  <div id="hudData">—</div>
+  <div><b id="hudOnde">—</b></div>
+  <div id="hudClima"></div>
+  <div id="hudCot"></div>
+  <div id="hudTimers"></div>
+  <div id="hudTela"></div>
+</div>
+<div class="hud" id="hudBL">
+  <div id="hudSisTitulo">Sistema</div>
+  <div>CPU <span class="barra"><i id="barCpu"></i></span> <b id="txtCpu">–</b></div>
+  <div>MEM <span class="barra"><i id="barMem"></i></span> <b id="txtMem">–</b></div>
+  <div>MIC <span class="barra"><i id="barMic"></i></span></div>
 </div>
 
+<div id="estado">EM ESPERA</div>
+
+<div id="legendas">
+  <div id="legVoce"></div>
+  <div id="legJarvis"></div>
+  <div id="link"><a target="_blank" rel="noopener" id="linkA">ABRIR</a></div>
+</div>
+
+<form id="formTexto" autocomplete="off"><input id="campo" placeholder="Digite para o Jarvis e aperte Enter…" enterkeyhint="send"></form>
+
+<div id="controles">
+  <span class="mini"></span>
+  <button class="ponto" id="btnSentinela" title="Modo sentinela: só responde quando você diz Jarvis (S)" aria-label="Modo sentinela"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></svg></button>
+  <button class="ponto" id="btnTeclado" title="Digitar (T)" aria-label="Digitar"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><rect x="2" y="6" width="20" height="12" rx="2"/><path d="M6 10h.01M10 10h.01M14 10h.01M18 10h.01M7 14h10"/></svg></button>
+  <button class="ponto" id="btnMic" title="Falar (Espaço)" aria-label="Ligar microfone"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3"/></svg></button>
+  <button class="ponto" id="btnMudo" title="Silenciar voz (M)" aria-label="Silenciar"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M4 9v6h4l5 4V5L8 9H4z"/><path id="ondas" d="M16.5 8.5a5 5 0 0 1 0 7M19 6a8.5 8.5 0 0 1 0 12"/></svg></button>
+  <button class="ponto" id="btnCamera" title="Modo visão / câmera (C)" aria-label="Modo visão"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg></button>
+  <button class="ponto" id="btnTela" title="Ver minha tela (V)" aria-label="Ver minha tela"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8M12 17v4"/></svg></button>
+  <button class="ponto" id="btnCasa" title="Casa inteligente — aparelhos" aria-label="Casa inteligente"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M3 11l9-8 9 8"/><path d="M5 10v10h14V10"/><path d="M9 20v-6h6v6"/></svg></button>
+  <button class="ponto" id="btnModo" title="Trocar interface (I)" aria-label="Trocar interface"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M12 3 2 8l10 5 10-5-10-5z"/><path d="m2 13 10 5 10-5"/></svg></button>
+  <span class="mini"></span>
+</div>
+
+<div id="inicio"><div><h1>J.A.R.V.I.S.</h1><p>Toque para iniciar</p></div></div>
+<button id="btnInstalar">⬇ INSTALAR NO CELULAR</button>
+
+<script src="visuais.js"></script>
 <script>
-const canvas = document.getElementById('brain');
-const ctx = canvas.getContext('2d');
-canvas.width = innerWidth;
-canvas.height = innerHeight;
+'use strict';
+// ════════════════════════════════════════════════════════════════
+//  VISUAIS (esfera · holograma · violeta) — ficam em visuais.js
+// ════════════════════════════════════════════════════════════════
+const tela = document.getElementById('esfera');
+const celular = /Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent);
+let nivelVoz = 0;          // 0..1 — volume da voz do Jarvis ou sua
+Visual.iniciar(tela, () => nivelVoz);
+let modoSalvo = 'nucleo';
+try { modoSalvo = localStorage.getItem('jarvis_modo') || 'nucleo'; } catch {}
+Visual.modo(modoSalvo);
+function visual(estado) { Visual.estado(estado); }
 
-// Define a forma do cérebro usando uma função de densidade
-// Retorna true se o ponto (x,y) normalizado está dentro da forma
-function inBrain(nx, ny) {
-  // Cabeça vista de perfil (lado esquerdo)
-  // nx, ny em [-1, 1]
-  const x = nx, y = ny;
+// ════════════════════════════════════════════════════════════════
+//  INTERFACE
+// ════════════════════════════════════════════════════════════════
+const $ = id => document.getElementById(id);
+const el = { estado: $('estado'), voce: $('legVoce'), jarvis: $('legJarvis'), link: $('link'), linkA: $('linkA'), mic: $('btnMic'), mudo: $('btnMudo'), teclado: $('btnTeclado'), form: $('formTexto'), campo: $('campo'), inicio: $('inicio') };
 
-  // Crânio (círculo principal)
-  const skull = (x + 0.1) * (x + 0.1) + y * y < 0.55;
-
-  // Testa/boca (protrusão à direita embaixo)
-  const jaw = x > 0.2 && x < 0.7 && y > -0.1 && y < 0.5 && (x - 0.2) * (x - 0.2) + (y - 0.2) * (y - 0.2) < 0.25;
-
-  // Pescoço
-  const neck = x > -0.3 && x < 0.3 && y > 0.5 && y < 1.0;
-
-  return skull || jaw || neck;
+let estado = 'espera';
+function mudarEstado(e, rotulo) {
+  estado = e;
+  visual(e);
+  el.estado.textContent = rotulo || { espera: 'EM ESPERA', ouvindo: 'OUVINDO', pensando: 'PROCESSANDO', falando: 'RESPONDENDO' }[e];
+  el.estado.classList.toggle('pulsa', e === 'ouvindo' || e === 'pensando');
 }
+function legendaVoce(txt, interim) { el.voce.textContent = txt ? '› ' + txt : ''; el.voce.classList.toggle('interim', !!interim); }
+function legendaJarvis(txt, erro) { el.jarvis.classList.remove('karaoke'); el.jarvis.textContent = txt || ''; el.jarvis.classList.toggle('erro', !!erro); }
 
-const N = 2500;
-const particles = [];
-let energy = 0.4;
-
-// Gera partículas dentro da forma
-let attempts = 0;
-while (particles.length < N && attempts < N * 20) {
-  attempts++;
-  const nx = Math.random() * 2 - 1;
-  const ny = Math.random() * 2 - 1;
-  if (inBrain(nx, ny)) {
-    particles.push({
-      // Posição base (forma)
-      bx: nx, by: ny,
-      // Posição atual (com dispersão)
-      x: nx, y: ny,
-      // Dispersão aleatória
-      ox: (Math.random() - 0.5) * 0.06,
-      oy: (Math.random() - 0.5) * 0.06,
-      size: Math.random() * 2 + 0.5,
-      alpha: Math.random() * 0.8 + 0.2,
-      phase: Math.random() * Math.PI * 2,
-      speed: 0.5 + Math.random() * 1.5
-    });
-  }
+function relogio() {
+  const d = new Date();
+  $('relogio').textContent = d.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+  $('hudData').textContent = d.toLocaleDateString('pt-BR', { weekday: 'short', day: '2-digit', month: 'short' }).replace(/\./g, '');
 }
+relogio(); setInterval(relogio, 10000);
 
-const cx = canvas.width / 2;
-const cy = canvas.height / 2;
-const scale = Math.min(canvas.width, canvas.height) * 0.35;
-
-function draw() {
-  ctx.fillStyle = 'rgba(0, 0, 0, 0.15)';
-  ctx.fillRect(0, 0, canvas.width, canvas.height);
-
-  const t = Date.now() / 1000;
-
-  particles.forEach(p => {
-    // Oscilação suave em torno da posição base
-    const wave = Math.sin(t * p.speed + p.phase) * 0.015 * (0.5 + energy);
-
-    const px = cx + (p.bx + p.ox + wave) * scale;
-    const py = cy + (p.by + p.oy + wave * 0.7) * scale;
-
-    // Algumas partículas se destacam quando há energia
-    const boost = Math.random() < energy * 0.02 ? 2 : 1;
-
-    ctx.fillStyle = `rgba(120, 180, 255, ${p.alpha * (0.5 + energy * 0.5)})`;
-    ctx.beginPath();
-    ctx.arc(px, py, p.size * boost, 0, Math.PI * 2);
-    ctx.fill();
-  });
-
-  // Brilho sutil no centro
-  const grad = ctx.createRadialGradient(cx, cy, 0, cx, cy, scale * 0.8);
-  grad.addColorStop(0, `rgba(77, 140, 255, ${0.05 + energy * 0.08})`);
-  grad.addColorStop(1, 'rgba(77, 140, 255, 0)');
-  ctx.fillStyle = grad;
-  ctx.fillRect(cx - scale, cy - scale, scale * 2, scale * 2);
-
-  requestAnimationFrame(draw);
-}
-draw();
-
-window.addEventListener('resize', () => {
-  canvas.width = innerWidth;
-  canvas.height = innerHeight;
-});
-
-// Voz
-let ativo = false, stream = null, rec = null, chunks = [];
-const btn = document.getElementById('btnMic');
-const statusEl = document.getElementById('status');
-
-btn.addEventListener('click', async () => {
-  if (!ativo) {
-    try {
-      stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      ativo = true;
-      btn.classList.add('on');
-      statusEl.textContent = 'ouvindo...';
-      energy = 0.9;
-      loop();
-    } catch { statusEl.textContent = 'microfone bloqueado'; }
-  } else {
-    ativo = false;
-    btn.classList.remove('on');
-    statusEl.textContent = 'toque para falar';
-    energy = 0.4;
-    if (stream) stream.getTracks().forEach(t => t.stop());
-  }
-});
-
-function loop() {
-  if (!ativo) return;
-  chunks = [];
-  rec = new MediaRecorder(stream);
-  rec.ondataavailable = e => { if (e.data.size) chunks.push(e.data); };
-  rec.onstop = send;
-  rec.start();
-  setTimeout(() => { try { if (rec.state === 'recording') rec.stop(); } catch {} }, 5000);
-}
-
-function fallbackVoz(texto) {
+// ════════════════════════════════════════════════════════════════
+//  STATUS DO SERVIDOR
+// ════════════════════════════════════════════════════════════════
+let saude = { comandos_pc: false, voz_piper: false, transcricao_servidor: false, cerebro: 'nenhum' };
+async function lerSaude() {
   try {
-    const u = new SpeechSynthesisUtterance(texto);
-    u.lang = 'pt-BR';
-    u.onend = () => {
-      energy = 0.9;
-      if (ativo) { statusEl.textContent = 'ouvindo...'; loop(); }
-    };
-    speechSynthesis.speak(u);
-  } catch {
-    energy = 0.9;
-    if (ativo) { statusEl.textContent = 'ouvindo...'; loop(); }
-  }
+    saude = await (await fetch('/api/health', { cache: 'no-store' })).json();
+    $('hudCerebro').textContent = saude.muse?.conectado ? 'MUSE' : (saude.cerebro || 'nenhum').toUpperCase();
+    $('hudVoz').textContent = mudo ? 'MUDO' : ({ eleven: 'PREMIUM', faber: 'FABER' }[saude.voz_motor] || 'NAVEGADOR');
+    $('hudOnde').textContent = saude.onde === 'computador' ? 'PC LOCAL' : 'NUVEM';
+    $('hudSisTitulo').textContent = saude.onde === 'computador' ? 'Sistema · PC' : 'Sistema · Servidor';
+  } catch { $('hudOnde').textContent = 'OFFLINE'; }
 }
-
-async function send() {
-  if (!ativo) return;
-  const blob = new Blob(chunks, { type: 'audio/webm' });
-  if (blob.size < 5000) { statusEl.textContent = 'fale mais alto / mais perto'; energy = 0.9; loop(); return; }
-  statusEl.textContent = 'processando...';
-  energy = 0.6;
+async function lerSistema() {
   try {
-    const fd = new FormData();
-    fd.append('audio', blob, 'a.webm');
-    const r = await fetch('/api/transcribe', { method: 'POST', body: fd });
-    const d = await r.json();
-    const txt = (d.text || '').trim();
-    if (!txt) { statusEl.textContent = 'ouvindo...'; energy = 0.9; loop(); return; }
-    statusEl.textContent = 'Você: ' + txt;
-    // Enfileira (retorna rápido) e aguarda a resposta por polling curto
-    const r2 = await fetch('/api/muse-brain/async', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ text: txt })
-    });
-    const d2a = await r2.json();
-    const reqId = d2a.id;
-    if (!reqId) throw new Error('sem id');
-    statusEl.textContent = 'pensando...';
-    let d2 = null;
-    for (let i = 0; i < 40; i++) {
-      await new Promise(r => setTimeout(r, 3000));
-      if (!ativo) return;
-      const rr = await fetch('/api/muse-brain/result/' + reqId);
-      const dd = await rr.json();
-      if (dd.ready) { d2 = dd; break; }
-      statusEl.textContent = 'pensando' + '.'.repeat((i % 3) + 1);
+    const s = await (await fetch('/api/sistema', { cache: 'no-store' })).json();
+    $('barCpu').style.width = s.cpu + '%'; $('txtCpu').textContent = s.cpu + '%';
+    $('barMem').style.width = s.memoria + '%'; $('txtMem').textContent = s.memoria + '%';
+  } catch {}
+}
+lerSaude(); lerSistema();
+setInterval(lerSaude, 15000); setInterval(lerSistema, 3000);
+
+// ════════════════════════════════════════════════════════════════
+//  ÁUDIO
+// ════════════════════════════════════════════════════════════════
+let ctxAudio = null, analisadorMic = null, fluxoMic = null, dadosMic = null;
+function garantirAudio() {
+  if (!ctxAudio) ctxAudio = new (window.AudioContext || window.webkitAudioContext)();
+  if (ctxAudio.state === 'suspended') ctxAudio.resume();
+}
+async function abrirMic() {
+  if (fluxoMic) return fluxoMic;
+  fluxoMic = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true } });
+  garantirAudio();
+  const src = ctxAudio.createMediaStreamSource(fluxoMic);
+  analisadorMic = ctxAudio.createAnalyser(); analisadorMic.fftSize = 1024;
+  dadosMic = new Uint8Array(analisadorMic.fftSize);
+  src.connect(analisadorMic);
+  return fluxoMic;
+}
+function nivelMic() {
+  if (!analisadorMic) return 0;
+  analisadorMic.getByteTimeDomainData(dadosMic);
+  let s = 0; for (let i = 0; i < dadosMic.length; i++) { const v = (dadosMic[i] - 128) / 128; s += v * v; }
+  return Math.sqrt(s / dadosMic.length);
+}
+// volume do mic alimenta a esfera e a barra do HUD
+setInterval(() => {
+  const n = nivelMic();
+  $('barMic').style.width = Math.min(100, n * 500) + '%';
+  if (estado === 'ouvindo') nivelVoz = Math.min(1, n * 4) * .6 + falaInterim * .4;
+  falaInterim *= .85;
+}, 50);
+let falaInterim = 0;
+
+// ════════════════════════════════════════════════════════════════
+//  OUVIDO — 1) reconhecimento do navegador  2) Whisper no servidor
+// ════════════════════════════════════════════════════════════════
+const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+let modoOuvido = SR ? 'navegador' : 'servidor';
+let ativo = false, rec = null, recRodando = false;
+let errosSeguidos = 0;
+
+function atualizarHudOuvido() { $('hudOuvido').textContent = modoOuvido === 'navegador' ? 'NAVEGADOR' : 'WHISPER'; }
+atualizarHudOuvido();
+
+function criarRec() {
+  const r = new SR();
+  r.lang = 'pt-BR';
+  r.continuous = !celular;
+  r.interimResults = true;
+  r.maxAlternatives = 1;
+  r.onstart = () => { recRodando = true; };
+  r.onresult = (e) => {
+    let interim = '', final = '';
+    for (let i = e.resultIndex; i < e.results.length; i++) {
+      const tx = e.results[i][0].transcript;
+      if (e.results[i].isFinal) final += tx; else interim += tx;
     }
-    if (!d2) throw new Error('timeout resposta');
-    const resp = (d2.response || '').trim();
-    if (resp) {
-      statusEl.textContent = 'Jarvis: ' + resp;
-      energy = 1.0;
-      const tocar = (url) => {
-        const au = new Audio(url);
-        au.onended = () => {
-          energy = 0.9;
-          if (ativo) { statusEl.textContent = 'ouvindo...'; loop(); }
-        };
-        au.onerror = () => fallbackVoz(resp);
-        au.play().catch(() => fallbackVoz(resp));
-      };
-      if (d2.audio_url) {
-        tocar(d2.audio_url);
-      } else {
-        fallbackVoz(resp);
+    errosSeguidos = 0;
+    if (interim) { legendaVoce(interim, true); falaInterim = .8; }
+    if (final.trim()) processar(final.trim(), true);
+  };
+  r.onerror = (e) => {
+    console.warn('reconhecimento:', e.error);
+    if (e.error === 'not-allowed') { legendaJarvis('Permita o uso do microfone no navegador (ícone de cadeado ao lado do endereço).', true); desligar(); }
+    else if (e.error === 'audio-capture') { legendaJarvis('Nenhum microfone encontrado. Verifique se ele está conectado.', true); desligar(); }
+    else if (e.error === 'network' || e.error === 'service-not-allowed' || e.error === 'language-not-supported') {
+      // navegador sem o serviço de voz (Brave, Opera, etc.) → usa Whisper do servidor
+      modoOuvido = 'servidor'; atualizarHudOuvido();
+      legendaVoce('trocando para o ouvido do servidor…');
+    } else if (e.error !== 'no-speech' && e.error !== 'aborted') {
+      errosSeguidos++;
+    }
+  };
+  r.onend = () => {
+    recRodando = false;
+    if (ativo && estado === 'ouvindo') {
+      if (modoOuvido === 'servidor') return ouvirServidor();
+      setTimeout(() => { if (ativo && estado === 'ouvindo' && !recRodando) iniciarRec(); }, errosSeguidos > 3 ? 1500 : 150);
+    }
+  };
+  return r;
+}
+function iniciarRec() {
+  if (!rec) rec = criarRec();
+  try { rec.start(); } catch {}
+}
+function pararRec() { if (rec) try { rec.abort(); } catch {} recRodando = false; }
+
+// ── Whisper: grava quando você fala, para quando fica em silêncio
+let gravador = null, laçoVAD = null;
+async function ouvirServidor() {
+  if (!saude.transcricao_servidor) {
+    legendaJarvis('Este navegador não tem reconhecimento de voz e o servidor está sem a chave GROQ_API_KEY. Use o Google Chrome ou o Edge, ou configure a chave.', true);
+    return;
+  }
+  try { await abrirMic(); } catch { legendaJarvis('Permita o uso do microfone no navegador.', true); return desligar(); }
+  pararVAD();
+  const tipos = ['audio/webm;codecs=opus', 'audio/webm', 'audio/mp4', 'audio/ogg;codecs=opus'];
+  const mime = tipos.find(t => window.MediaRecorder && MediaRecorder.isTypeSupported(t)) || '';
+  let piso = .01, gravando = false, inicio = 0, ultimaVoz = 0, pedacos = [];
+  laçoVAD = setInterval(() => {
+    if (!ativo || estado !== 'ouvindo') return pararVAD();
+    const n = nivelMic();
+    const limiar = Math.max(.025, piso * 2.8);
+    const agora = performance.now();
+    if (!gravando) {
+      piso = piso * .97 + n * .03;
+      if (n > limiar) {
+        pedacos = [];
+        gravador = new MediaRecorder(fluxoMic, mime ? { mimeType: mime } : undefined);
+        gravador.ondataavailable = e => e.data.size && pedacos.push(e.data);
+        gravador.onstop = () => enviarAudio(new Blob(pedacos, { type: gravador.mimeType || 'audio/webm' }), agora - inicio);
+        gravador.start(); gravando = true; inicio = ultimaVoz = agora;
+        legendaVoce('…', true);
       }
     } else {
-      statusEl.textContent = 'ouvindo...';
-      energy = 0.9;
-      loop();
+      if (n > limiar) ultimaVoz = agora;
+      if (agora - ultimaVoz > 1100 || agora - inicio > 15000) { gravando = false; try { gravador.stop(); } catch {} }
     }
-  } catch {
-    statusEl.textContent = 'erro, tentando...';
-    setTimeout(() => { if (ativo) { statusEl.textContent = 'ouvindo...'; energy = 0.9; loop(); } }, 2000);
+  }, 50);
+}
+function pararVAD() { clearInterval(laçoVAD); laçoVAD = null; if (gravador && gravador.state === 'recording') { gravador.onstop = null; try { gravador.stop(); } catch {} } }
+
+async function enviarAudio(blob, duracao) {
+  if (duracao < 450 || blob.size < 2500) { legendaVoce(''); return; }
+  pararVAD();
+  mudarEstado('pensando', 'TRANSCREVENDO');
+  try {
+    const fd = new FormData(); fd.append('audio', blob, 'fala.' + (blob.type.includes('mp4') ? 'mp4' : 'webm'));
+    const r = await fetch('/api/transcribe', { method: 'POST', body: fd });
+    const d = await r.json();
+    if (!r.ok) throw new Error(d.mensagem || d.error);
+    const txt = (d.text || '').trim();
+    if (!txt || /^(obrigad[oa]|tchau|legendas pela comunidade.*)\.?$/i.test(txt)) { voltarAOuvir(); return; }
+    processar(txt, true);
+  } catch (e) {
+    legendaJarvis('Falha na transcrição: ' + e.message, true);
+    voltarAOuvir();
   }
 }
+
+// ── liga / desliga
+function voltarAOuvir() {
+  if (!ativo) { mudarEstado('espera'); return; }
+  mudarEstado('ouvindo', sentinela && Date.now() > janelaConversa ? 'SENTINELA · DIGA JARVIS' : 'OUVINDO');
+  if (modoOuvido === 'navegador') iniciarRec(); else ouvirServidor();
+}
+async function ligar() {
+  garantirAudio();
+  ativo = true;
+  el.mic.classList.add('ligado');
+  el.mic.setAttribute('aria-label', 'Desligar microfone');
+  // no computador abrimos o mic também para a esfera reagir ao volume
+  if (!celular || modoOuvido === 'servidor') { try { await abrirMic(); } catch { legendaJarvis('Permita o uso do microfone no navegador.', true); return desligar(); } }
+  voltarAOuvir();
+}
+function desligar() {
+  ativo = false;
+  el.mic.classList.remove('ligado');
+  el.mic.setAttribute('aria-label', 'Ligar microfone');
+  pararRec(); pararVAD();
+  if (estado === 'ouvindo') mudarEstado('espera');
+}
+
+// ════════════════════════════════════════════════════════════════
+//  CÉREBRO
+// ════════════════════════════════════════════════════════════════
+let historico = [];
+try { historico = JSON.parse(localStorage.getItem('jarvis_hist') || '[]'); } catch {}
+let processando = false;
+
+// palavra de ativação (o reconhecimento às vezes escreve "Javis", "Jarbas"…)
+const RE_NOME = /\b(j[aá]r?v[ie]s|jarbas|jarvas|djarvis|jarvi)\b[\s,.!?:]*/i;
+let sentinela = false, janelaConversa = 0;
+try { sentinela = localStorage.getItem('jarvis_sentinela') === '1'; } catch {}
+
+async function processar(texto, deVoz) {
+  if (processando) return;
+  if (sentinela && deVoz) {
+    const chamou = RE_NOME.test(texto);
+    if (!chamou && Date.now() > janelaConversa) {
+      legendaVoce(texto, true);
+      if (modoOuvido === 'servidor') voltarAOuvir();
+      return;
+    }
+    texto = texto.replace(RE_NOME, ' ').replace(/^[\s,.!?]+/, '').trim();
+    if (!texto) {
+      processando = true; pararRec(); pararVAD();
+      await falar(`Pois não, ${saude.dono || 'senhor'}?`);
+      processando = false; janelaConversa = Date.now() + 12000;
+      voltarAOuvir();
+      return;
+    }
+  }
+  processando = true;
+  pararRec(); pararVAD();
+  legendaVoce(texto);
+  legendaJarvis('');
+  el.link.style.display = 'none';
+  mudarEstado('pensando');
+  try {
+    const r = await fetch('/api/chat', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ text: texto, history: historico })
+    });
+    const d = await r.json();
+    if (!r.ok) throw new Error(d.error || 'HTTP ' + r.status);
+    historico.push({ role: 'user', content: texto }, { role: 'assistant', content: d.fala });
+    historico = historico.slice(-16);
+    try { localStorage.setItem('jarvis_hist', JSON.stringify(historico)); } catch {}
+    if (d.cerebro) $('hudCerebro').textContent = d.cerebro.toUpperCase();
+    const acaoTela = d.acao && d.acao.tipo === 'tela';
+    if (d.acao && !acaoTela) executarAcao(d.acao);
+    await falar(d.fala, d.audio_url);
+    if (acaoTela) { if (!d.acao.pergunta) d.acao.pergunta = texto; await executarAcao(d.acao); }
+    janelaConversa = Date.now() + 12000;
+    if (d.erro === 'sem_chave') legendaJarvis('Configure a chave GROQ_API_KEY (grátis em console.groq.com) — veja o arquivo LEIA-ME.', true);
+  } catch (e) {
+    legendaJarvis('Sem conexão com o servidor do Jarvis. Tentando de novo em instantes.', true);
+    await new Promise(r => setTimeout(r, 1500));
+  }
+  processando = false;
+  voltarAOuvir();
+}
+
+// ════════════════════════════════════════════════════════════════
+//  AÇÕES — abrir sites e programas
+// ════════════════════════════════════════════════════════════════
+function urlDaAcao(a) {
+  if (a.tipo === 'abrir_site' && a.url) return /^https?:\/\//.test(a.url) ? a.url : 'https://' + a.url;
+  if (a.tipo === 'pesquisar' && a.termo) return 'https://www.google.com/search?q=' + encodeURIComponent(a.termo);
+  if (a.tipo === 'youtube' && a.termo) return 'https://www.youtube.com/results?search_query=' + encodeURIComponent(a.termo);
+  if (a.url) return a.url;
+  return null;
+}
+async function executarAcao(a) {
+  if (!a || typeof a !== 'object') return;
+  if (a.tipo === 'interface') return trocarModo(a.modo);
+  if (a.tipo === 'timer') return criarTimer(a.segundos, a.mensagem);
+  if (a.tipo === 'tela') {
+    if (a.sub === 'parar') return pararTela(true);
+    if (a.sub === 'vigiar') return vigiarTela();
+    return descreverTela(a.pergunta || '');
+  }
+  const url = urlDaAcao(a);
+  if (saude.comandos_pc) {
+    try {
+      const r = await (await fetch('/api/pc/acao', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(url ? { url } : a) })).json();
+      if (r.ok) return;
+    } catch {}
+  }
+  if (url) {
+    const w = window.open(url, '_blank', 'noopener');
+    if (!w) { el.linkA.href = url; el.linkA.textContent = 'TOQUE PARA ABRIR ↗'; el.link.style.display = 'block'; }
+  } else if (a.tipo === 'abrir_app' || a.tipo === 'sistema') {
+    legendaVoce('isso só funciona com o Jarvis rodando no seu computador');
+  }
+}
+
+// ════════════════════════════════════════════════════════════════
+//  VOZ — Piper (Faber) → voz do navegador
+// ════════════════════════════════════════════════════════════════
+let mudo = false;
+try { mudo = localStorage.getItem('jarvis_mudo') === '1'; } catch {}
+let audioAtual = null;
+
+// legenda palavra por palavra (blocos de até 7 palavras, como nos vídeos)
+function digitar(texto, ms) {
+  const ini = performance.now();
+  const palavras = texto.split(/\s+/).filter(Boolean);
+  const BLOCO = celular ? 5 : 7;
+  const esc = w => w.replace(/[&<>]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' }[c]));
+  let ultimoIdx = -1;
+  el.jarvis.classList.add('karaoke');
+  return setInterval(() => {
+    const k = Math.min(1, (performance.now() - ini) / Math.max(400, ms));
+    const idx = Math.min(palavras.length - 1, Math.floor(k * palavras.length));
+    if (idx === ultimoIdx) return;
+    ultimoIdx = idx;
+    const ini2 = Math.floor(idx / BLOCO) * BLOCO;
+    el.jarvis.innerHTML = palavras.slice(ini2, ini2 + BLOCO)
+      .map((w, i) => `<span class="w${ini2 + i <= idx ? ' dita' : ''}">${esc(w)}</span>`).join(' ');
+  }, 40);
+}
+
+async function falar(texto, audioUrl) {
+  if (!texto) return;
+  legendaJarvis('', false);
+  if (mudo) { legendaJarvis(texto); return; }
+  mudarEstado('falando');
+  try {
+    let url = audioUrl, local = false;
+    if (!url && saude.voz_motor && saude.voz_motor !== 'navegador') {
+      const r = await fetch('/api/tts', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ text: texto }) });
+      if (!r.ok) throw new Error('tts');
+      url = URL.createObjectURL(await r.blob()); local = true;
+    }
+    if (!url) throw new Error('sem voz');
+    await tocar(url, texto, local);
+  } catch {
+    await vozNavegador(texto);
+  }
+  nivelVoz = 0;
+  legendaJarvis(texto);
+}
+
+function tocar(url, texto, analisar) {
+  return new Promise((ok, falha) => {
+    const au = new Audio(url);
+    audioAtual = au;
+    let timer = null, laço = null;
+    au.onloadedmetadata = () => { timer = digitar(texto, au.duration * 1000 * .9); };
+    if (analisar && ctxAudio) {
+      try {
+        const src = ctxAudio.createMediaElementSource(au);
+        const an = ctxAudio.createAnalyser(); an.fftSize = 512;
+        const buf = new Uint8Array(an.fftSize);
+        src.connect(an); an.connect(ctxAudio.destination);
+        laço = setInterval(() => {
+          an.getByteTimeDomainData(buf);
+          let s = 0; for (let i = 0; i < buf.length; i++) { const v = (buf[i] - 128) / 128; s += v * v; }
+          nivelVoz = Math.min(1, Math.sqrt(s / buf.length) * 5);
+        }, 33);
+      } catch {}
+    } else {
+      laço = setInterval(() => { nivelVoz = .3 + Math.random() * .5; }, 90);
+    }
+    const fim = (erro) => { clearInterval(timer); clearInterval(laço); nivelVoz = 0; audioAtual = null; erro ? falha(erro) : ok(); };
+    au.onended = () => fim();
+    au.onerror = () => fim(new Error('audio'));
+    au.play().catch(fim);
+  });
+}
+
+function vozNavegador(texto) {
+  return new Promise(ok => {
+    if (!('speechSynthesis' in window)) return ok();
+    const u = new SpeechSynthesisUtterance(texto);
+    u.lang = 'pt-BR'; u.rate = 1.05; u.pitch = .9;
+    const vozes = speechSynthesis.getVoices().filter(v => v.lang.replace('_', '-').toLowerCase().startsWith('pt-br'));
+    u.voice = vozes.find(v => /daniel|antonio|male|masculin/i.test(v.name)) || vozes.find(v => /google/i.test(v.name)) || vozes[0] || null;
+    const timer = digitar(texto, texto.length * 65);
+    const laço = setInterval(() => { nivelVoz = .25 + Math.random() * .55; }, 90);
+    const fim = () => { clearInterval(timer); clearInterval(laço); nivelVoz = 0; ok(); };
+    u.onend = fim; u.onerror = fim;
+    speechSynthesis.cancel();
+    speechSynthesis.speak(u);
+    setTimeout(fim, 4000 + texto.length * 120); // segurança
+  });
+}
+if ('speechSynthesis' in window) speechSynthesis.onvoiceschanged = () => {};
+
+// ════════════════════════════════════════════════════════════════
+//  CONTROLES
+// ════════════════════════════════════════════════════════════════
+function atualizarMudo() {
+  el.mudo.classList.toggle('ativo', mudo);
+  document.getElementById('ondas').style.display = mudo ? 'none' : '';
+  $('hudVoz').textContent = mudo ? 'MUDO' : ({ eleven: 'PREMIUM', faber: 'FABER' }[saude.voz_motor] || 'NAVEGADOR');
+}
+atualizarMudo();
+
+el.mic.onclick = () => {
+  if (audioAtual) { audioAtual.pause(); audioAtual.onended?.(); }
+  ativo ? desligar() : ligar();
+};
+el.mudo.onclick = () => {
+  mudo = !mudo;
+  try { localStorage.setItem('jarvis_mudo', mudo ? '1' : '0'); } catch {}
+  if (mudo && audioAtual) { audioAtual.pause(); audioAtual.onended?.(); }
+  if (mudo) speechSynthesis?.cancel();
+  atualizarMudo();
+};
+el.teclado.onclick = () => {
+  const abrir = !el.form.classList.contains('aberto');
+  el.form.classList.toggle('aberto', abrir);
+  el.teclado.classList.toggle('ativo', abrir);
+  document.body.classList.toggle('digitando', abrir);
+  if (abrir) el.campo.focus();
+};
+el.form.onsubmit = (e) => {
+  e.preventDefault();
+  const t = el.campo.value.trim();
+  if (!t) return;
+  garantirAudio();
+  el.campo.value = '';
+  if (audioAtual) { audioAtual.pause(); audioAtual.onended?.(); }
+  processar(t);
+};
+addEventListener('keydown', (e) => {
+  if (e.target === el.campo) { if (e.key === 'Escape') el.teclado.click(); return; }
+  if (e.code === 'Space') { e.preventDefault(); el.mic.click(); }
+  if (e.key === 't' || e.key === 'T') { e.preventDefault(); el.teclado.click(); }
+  if (e.key === 'm' || e.key === 'M') el.mudo.click();
+  if (e.key === 'i' || e.key === 'I') { if (Visual.atual() === 'camera') trocarModo(modoRostoAnterior); else trocarModo(); }
+  if (e.key === 'c' || e.key === 'C') alternarCamera();
+  if (e.key === 'v' || e.key === 'V') alternarTela();
+  if (e.key === 's' || e.key === 'S') alternarSentinela();
+});
+
+// ── trocar interface (botão, tecla I ou por voz)
+const NOMES_MODO = { nucleo: 'NÚCLEO', esfera: 'ESFERA', holograma: 'HOLOGRAMA', tempestade: 'TEMPESTADE', camera: 'VISÃO' };
+let modoRostoAnterior = Visual.modos.includes(modoSalvo) ? modoSalvo : 'holograma';
+function trocarModo(nome) {
+  const lista = Visual.modos;
+  if (!nome || (!lista.includes(nome) && nome !== 'camera')) nome = lista[(lista.indexOf(Visual.atual()) + 1) % lista.length];
+  if (lista.includes(nome)) modoRostoAnterior = nome;
+  Visual.modo(nome);
+  try { if (nome !== 'camera') localStorage.setItem('jarvis_modo', nome); } catch {}
+  document.querySelector('meta[name=theme-color]').content = { nucleo: '#02060d', esfera: '#081226', holograma: '#02050b', tempestade: '#0b0216', camera: '#04070e' }[nome];
+  $('btnCamera').classList.toggle('ativo', nome === 'camera');
+  if (estado !== 'falando') legendaVoce('interface: ' + NOMES_MODO[nome]);
+}
+$('btnModo').onclick = () => { if (Visual.atual() === 'camera') trocarModo(modoRostoAnterior); else trocarModo(); };
+function alternarCamera() { trocarModo(Visual.atual() === 'camera' ? modoRostoAnterior : 'camera'); }
+$('btnCamera').onclick = alternarCamera;
+
+// tela inicial: o toque libera microfone e áudio (exigência dos navegadores)
+el.inicio.onclick = async () => {
+  el.inicio.classList.add('some');
+  Visual.modo(Visual.atual()); // reapresenta a montagem
+  garantirAudio();
+  await lerSaude();
+  const h = new Date().getHours();
+  const saud = h < 5 ? 'Boa noite' : h < 12 ? 'Bom dia' : h < 18 ? 'Boa tarde' : 'Boa noite';
+  const dono = saude.dono || 'senhor';
+  somInicio();
+  const p = await lerPainel();
+  const c = p?.clima;
+  const extra = c ? ` Em ${c.cidade.split(',')[0]}, ${c.agora.temperatura} graus e ${c.agora.condicao}.` : '';
+  await falar(`${saud}, ${dono}. Todos os sistemas estão online.${extra} Em que posso ajudar?`);
+  ligar();
+};
+// ════════════════════════════════════════════════════════════════
+//  PAINEL — clima e cotações em tempo real
+// ════════════════════════════════════════════════════════════════
+async function lerPainel() {
+  try {
+    const p = await (await fetch('/api/painel', { cache: 'no-store' })).json();
+    if (p.clima) $('hudClima').textContent = `${p.clima.cidade.split(',')[0]} ${p.clima.agora.temperatura}° · ${p.clima.agora.condicao}`;
+    if (p.cotacao) {
+      const f = (c, k, casas) => { const q = p.cotacao[c]; if (!q) return ''; const s = q.variacao_pct >= 0 ? '▲' : '▼'; return `${k} ${q.valor_reais.toLocaleString('pt-BR', { maximumFractionDigits: casas })} ${s}${Math.abs(q.variacao_pct).toLocaleString('pt-BR', { minimumFractionDigits: 1, maximumFractionDigits: 1 })}%`; };
+      $('hudCot').textContent = [f('USD', 'USD', 2), f('BTC', 'BTC', 0)].filter(Boolean).join('  ·  ');
+    }
+    return p;
+  } catch { return null; }
+}
+lerPainel(); setInterval(lerPainel, 600000);
+
+// ════════════════════════════════════════════════════════════════
+//  TIMERS E LEMBRETES
+// ════════════════════════════════════════════════════════════════
+let timers = [];
+try { timers = JSON.parse(localStorage.getItem('jarvis_timers') || '[]').filter(t => t.fim > Date.now() - 60000); } catch {}
+const salvarTimers = () => { try { localStorage.setItem('jarvis_timers', JSON.stringify(timers)); } catch {} };
+function criarTimer(segundos, mensagem) {
+  segundos = Math.max(1, Math.min(86400 * 7, Number(segundos) || 60));
+  timers.push({ fim: Date.now() + segundos * 1000, msg: String(mensagem || '').slice(0, 120) });
+  salvarTimers(); mostrarTimers();
+}
+function fmtTempo(ms) {
+  const s = Math.max(0, Math.ceil(ms / 1000)), h = Math.floor(s / 3600), m = Math.floor(s % 3600 / 60), ss = s % 60;
+  return (h ? h + ':' + String(m).padStart(2, '0') : m) + ':' + String(ss).padStart(2, '0');
+}
+function mostrarTimers() {
+  $('hudTimers').innerHTML = timers.map(t => `<div>⏱ ${fmtTempo(t.fim - Date.now())}${t.msg ? ' · ' + t.msg.replace(/[<>&]/g, '') : ''}</div>`).join('');
+}
+function bipe(vezes = 3) {
+  garantirAudio();
+  for (let i = 0; i < vezes; i++) {
+    const o = ctxAudio.createOscillator(), gn = ctxAudio.createGain(), t0 = ctxAudio.currentTime + i * .32;
+    o.type = 'sine'; o.frequency.setValueAtTime(880, t0); o.frequency.setValueAtTime(1320, t0 + .1);
+    gn.gain.setValueAtTime(0, t0); gn.gain.linearRampToValueAtTime(.18, t0 + .02); gn.gain.exponentialRampToValueAtTime(.001, t0 + .25);
+    o.connect(gn); gn.connect(ctxAudio.destination); o.start(t0); o.stop(t0 + .3);
+  }
+}
+let alarmeTocando = false;
+async function dispararTimer(t) {
+  alarmeTocando = true;
+  while (processando) await new Promise(r => setTimeout(r, 300));
+  processando = true; pararRec(); pararVAD();
+  bipe(3);
+  await new Promise(r => setTimeout(r, 1000));
+  const dono = (saude.dono || 'senhor').replace(/^./, c => c.toUpperCase());
+  await falar(`${dono}, ${t.msg ? 'lembrete: ' + t.msg : 'o seu timer terminou'}.`);
+  processando = false; alarmeTocando = false;
+  janelaConversa = Date.now() + 12000;
+  voltarAOuvir();
+}
+setInterval(() => {
+  const agora = Date.now();
+  const vencidos = timers.filter(t => t.fim <= agora);
+  if (vencidos.length) { timers = timers.filter(t => t.fim > agora); salvarTimers(); vencidos.forEach(dispararTimer); }
+  mostrarTimers();
+}, 1000);
+mostrarTimers();
+
+// ════════════════════════════════════════════════════════════════
+//  MODO SENTINELA — escuta sempre, responde quando chamado
+// ════════════════════════════════════════════════════════════════
+function alternarSentinela() {
+  sentinela = !sentinela;
+  try { localStorage.setItem('jarvis_sentinela', sentinela ? '1' : '0'); } catch {}
+  $('btnSentinela').classList.toggle('ativo', sentinela);
+  legendaVoce(sentinela ? 'sentinela ligado: diga "Jarvis" antes do pedido' : 'sentinela desligado: respondo tudo o que ouvir');
+  if (sentinela && !ativo) ligar();
+  else if (ativo && estado === 'ouvindo') mudarEstado('ouvindo', sentinela ? 'SENTINELA · DIGA JARVIS' : 'OUVINDO');
+}
+$('btnSentinela').classList.toggle('ativo', sentinela);
+$('btnSentinela').onclick = alternarSentinela;
+
+// som de inicialização (sintetizado, sem arquivos)
+function somInicio() {
+  try {
+    garantirAudio();
+    const t0 = ctxAudio.currentTime;
+    const o = ctxAudio.createOscillator(), o2 = ctxAudio.createOscillator(), gn = ctxAudio.createGain(), filtro = ctxAudio.createBiquadFilter();
+    o.type = 'sawtooth'; o2.type = 'sine';
+    o.frequency.setValueAtTime(70, t0); o.frequency.exponentialRampToValueAtTime(420, t0 + 1.4);
+    o2.frequency.setValueAtTime(140, t0); o2.frequency.exponentialRampToValueAtTime(1100, t0 + 1.4);
+    filtro.type = 'lowpass'; filtro.frequency.setValueAtTime(300, t0); filtro.frequency.exponentialRampToValueAtTime(3000, t0 + 1.4);
+    gn.gain.setValueAtTime(0, t0); gn.gain.linearRampToValueAtTime(.09, t0 + .5); gn.gain.exponentialRampToValueAtTime(.001, t0 + 1.9);
+    o.connect(filtro); o2.connect(filtro); filtro.connect(gn); gn.connect(ctxAudio.destination);
+    o.start(t0); o2.start(t0); o.stop(t0 + 2); o2.stop(t0 + 2);
+    const sino = ctxAudio.createOscillator(), gs = ctxAudio.createGain();
+    sino.frequency.value = 1760; gs.gain.setValueAtTime(0, t0 + 1.4); gs.gain.linearRampToValueAtTime(.08, t0 + 1.42); gs.gain.exponentialRampToValueAtTime(.001, t0 + 2.4);
+    sino.connect(gs); gs.connect(ctxAudio.destination); sino.start(t0 + 1.4); sino.stop(t0 + 2.5);
+  } catch {}
+}
+
+// ════════════════════════════════════════════════════════════════
+//  APP DE CELULAR (PWA) — instalação e service worker
+// ════════════════════════════════════════════════════════════════
+if ('serviceWorker' in navigator) {
+  addEventListener('load', () => navigator.serviceWorker.register('sw.js').catch(() => {}));
+}
+let promptInstalar = null;
+addEventListener('beforeinstallprompt', (e) => {
+  e.preventDefault(); promptInstalar = e;
+  if (!matchMedia('(display-mode: standalone)').matches) $('btnInstalar').classList.add('mostra');
+});
+$('btnInstalar').onclick = async () => {
+  if (!promptInstalar) return;
+  $('btnInstalar').classList.remove('mostra');
+  promptInstalar.prompt();
+  await promptInstalar.userChoice.catch(() => {});
+  promptInstalar = null;
+};
+addEventListener('appinstalled', () => $('btnInstalar').classList.remove('mostra'));
+// iPhone/Safari não dispara o evento: mostra dica de "Compartilhar → Tela de Início"
+if (/iPhone|iPad|iPod/.test(navigator.userAgent) && !navigator.standalone && !matchMedia('(display-mode: standalone)').matches) {
+  const b = $('btnInstalar'); b.textContent = '⬇ INSTALAR: COMPARTILHAR → TELA DE INÍCIO'; b.classList.add('mostra');
+  b.onclick = () => b.classList.remove('mostra');
+}
+
+// ════════════════════════════════════════════════════════════════
+//  VISÃO DE TELA — ele vê e descreve o que está na sua tela
+//  (você escolhe o que compartilhar; funciona no computador)
+// ════════════════════════════════════════════════════════════════
+let telaStream = null, telaVideo = null, vigiaTela = null, ultimaDescTela = '';
+const temCapturaTela = !!(navigator.mediaDevices && navigator.mediaDevices.getDisplayMedia);
+
+function hudTela(txt) { $('hudTela').innerHTML = txt ? `<div class="fim">👁 ${txt}</div>` : ''; }
+
+async function iniciarTela() {
+  if (telaStream) return true;
+  if (!temCapturaTela) {
+    await falar(`${saude.dono || 'Senhor'}, ver a tela só funciona no computador. No celular eu uso a câmera, pelo botão de visão.`);
+    return false;
+  }
+  try {
+    telaStream = await navigator.mediaDevices.getDisplayMedia({ video: { frameRate: 1 }, audio: false });
+    telaVideo = document.createElement('video');
+    telaVideo.setAttribute('playsinline', ''); telaVideo.muted = true;
+    telaVideo.srcObject = telaStream; await telaVideo.play().catch(() => {});
+    telaStream.getVideoTracks()[0].addEventListener('ended', () => pararTela(false));
+    $('btnTela').classList.add('ativo');
+    return true;
+  } catch (e) {
+    telaStream = null;
+    if (e.name !== 'NotAllowedError') await falar('Não consegui acessar a tela, senhor.');
+    return false;
+  }
+}
+function pararTela(avisar) {
+  if (vigiaTela) { clearInterval(vigiaTela); vigiaTela = null; }
+  if (telaStream) { telaStream.getTracks().forEach(t => t.stop()); telaStream = null; }
+  telaVideo = null; ultimaDescTela = '';
+  $('btnTela').classList.remove('ativo'); hudTela('');
+  if (avisar) legendaVoce('parei de ver a sua tela');
+}
+function capturarTela() {
+  if (!telaVideo || !telaVideo.videoWidth) return null;
+  const maxL = 1280, esc = Math.min(1, maxL / telaVideo.videoWidth);
+  const cv = document.createElement('canvas');
+  cv.width = Math.round(telaVideo.videoWidth * esc); cv.height = Math.round(telaVideo.videoHeight * esc);
+  cv.getContext('2d').drawImage(telaVideo, 0, 0, cv.width, cv.height);
+  return cv.toDataURL('image/jpeg', 0.55);
+}
+async function pedirDescricao(pergunta, continuo) {
+  const imagem = capturarTela();
+  if (!imagem) return null;
+  try {
+    const r = await fetch('/api/visao', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ imagem, pergunta, continuo }) });
+    const d = await r.json();
+    if (!r.ok) throw new Error(d.mensagem || d.error);
+    return (d.descricao || '').trim();
+  } catch (e) {
+    return '__erro__' + e.message;
+  }
+}
+async function descreverTela(pergunta) {
+  if (!saude.visao_tela) { await falar('Preciso da chave do Groq configurada para enxergar a tela, senhor.'); return; }
+  const ok = await iniciarTela();
+  if (!ok) return;
+  mudarEstado('pensando', 'ANALISANDO TELA');
+  const desc = await pedirDescricao(pergunta || '', false);
+  if (desc && desc.startsWith('__erro__')) { legendaJarvis('Não consegui analisar a tela: ' + desc.slice(8), true); voltarAOuvir(); return; }
+  if (desc) { ultimaDescTela = desc; await falar(desc); } else voltarAOuvir();
+}
+async function vigiarTela() {
+  if (!saude.visao_tela) { await falar('Preciso da chave do Groq configurada para enxergar a tela, senhor.'); return; }
+  const ok = await iniciarTela();
+  if (!ok) return;
+  hudTela('acompanhando sua tela');
+  if (vigiaTela) clearInterval(vigiaTela);
+  const tick = async () => {
+    if (!telaStream || processando || alarmeTocando) return;
+    const desc = await pedirDescricao('', true);
+    if (!desc || desc.startsWith('__erro__')) return;
+    // só fala se mudou de verdade
+    const a = desc.toLowerCase().slice(0, 45), b = ultimaDescTela.toLowerCase().slice(0, 45);
+    if (a === b) return;
+    ultimaDescTela = desc;
+    if (!processando && !alarmeTocando) { processando = true; pararRec(); pararVAD(); await falar(desc); processando = false; voltarAOuvir(); }
+  };
+  await tick();
+  vigiaTela = setInterval(tick, 12000);
+}
+async function alternarTela() {
+  if (telaStream) pararTela(true);
+  else { garantirAudio(); await descreverTela(''); }
+}
+$('btnTela').onclick = alternarTela;
+$('btnCasa').onclick = () => { location.href = 'casa.html'; };
+
+mudarEstado('espera');
 </script>
 </body>
 </html>

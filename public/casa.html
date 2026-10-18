@@ -1,0 +1,165 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="theme-color" content="#081226">
+<title>J.A.R.V.I.S. — Casa</title>
+<link href="https://fonts.googleapis.com/css2?family=Rajdhani:wght@500;600&family=Inter:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  :root { --az:#7db8ff; --az2:#4d9bff; --fr:rgba(125,184,255,.4); --ln:rgba(125,184,255,.18); --tx:#eaf3ff; }
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body { background:radial-gradient(ellipse at 50% 0%, #10224a, #081226 60%, #040913); color:var(--tx); font-family:'Inter',system-ui,sans-serif; min-height:100vh; padding:max(18px,env(safe-area-inset-top)) 16px 40px; }
+  .topo { display:flex; align-items:center; gap:14px; margin-bottom:6px; }
+  a.voltar { color:var(--az); text-decoration:none; border:1px solid var(--fr); border-radius:30px; padding:7px 14px; font-family:'Rajdhani'; letter-spacing:.1em; font-size:13px; }
+  h1 { font-family:'Rajdhani'; font-weight:600; letter-spacing:.25em; color:var(--az); font-size:19px; }
+  .sub { color:var(--fr); font-size:13px; margin:4px 0 20px; line-height:1.5; }
+  .cartao { background:rgba(10,22,46,.6); border:1px solid var(--ln); border-radius:14px; padding:14px; margin-bottom:12px; }
+  .lin { display:flex; gap:8px; flex-wrap:wrap; align-items:center; }
+  label { display:block; font-size:12px; color:var(--fr); letter-spacing:.08em; margin:10px 0 4px; text-transform:uppercase; }
+  input, select { width:100%; background:rgba(6,16,36,.85); border:1px solid var(--fr); color:var(--tx); font:14px 'Inter'; padding:11px 12px; border-radius:9px; outline:none; }
+  input::placeholder { color:rgba(125,184,255,.4); }
+  .col { flex:1 1 220px; min-width:0; }
+  button { font-family:'Rajdhani'; letter-spacing:.1em; border-radius:9px; cursor:pointer; border:1px solid var(--fr); background:rgba(77,155,255,.14); color:var(--az); padding:10px 14px; font-size:13px; }
+  button.prim { background:var(--az2); color:#02101f; border-color:var(--az2); font-weight:600; }
+  button.rem { border-color:rgba(255,120,120,.5); color:#ff9a9a; background:rgba(255,80,80,.08); }
+  .acoes { display:flex; gap:8px; flex-wrap:wrap; margin-top:12px; }
+  .barra { display:flex; gap:10px; align-items:center; margin:22px 0 10px; }
+  .barra h2 { font-family:'Rajdhani'; font-weight:600; letter-spacing:.15em; font-size:15px; color:var(--az); }
+  .aviso { background:rgba(255,200,80,.08); border:1px solid rgba(255,200,80,.3); color:#ffe0a0; border-radius:10px; padding:12px; font-size:13px; line-height:1.5; margin-bottom:16px; }
+  details { background:rgba(10,22,46,.5); border:1px solid var(--ln); border-radius:12px; padding:12px 14px; margin-top:14px; }
+  summary { cursor:pointer; color:var(--az); font-family:'Rajdhani'; letter-spacing:.1em; }
+  code { background:rgba(0,0,0,.4); padding:2px 6px; border-radius:5px; color:#bcd8ff; font-size:12px; word-break:break-all; }
+  pre { background:rgba(0,0,0,.45); border:1px solid var(--ln); border-radius:9px; padding:12px; overflow:auto; font-size:12px; color:#bcd8ff; margin-top:8px; }
+  #msg { position:fixed; left:50%; bottom:24px; transform:translateX(-50%); background:var(--az2); color:#02101f; font-family:'Rajdhani'; letter-spacing:.1em; padding:12px 22px; border-radius:30px; opacity:0; transition:.3s; pointer-events:none; }
+  #msg.ver { opacity:1; }
+  .tag { font-size:11px; color:var(--fr); }
+</style>
+</head>
+<body>
+<div class="topo"><a class="voltar" href="./">‹ VOLTAR</a><h1>CASA INTELIGENTE</h1></div>
+<p class="sub">Cadastre seus aparelhos e o Jarvis liga e desliga por voz: <em>"liga a luz da sala"</em>, <em>"desliga a TV"</em>, <em>"liga tudo"</em>.</p>
+
+<div class="aviso">
+  O Jarvis não fala direto com a lâmpada. Ele dispara um <b>link (webhook)</b> que o seu app de casa inteligente oferece.
+  No seu app (Smart Life/Tuya, SmartThings, IFTTT, Alexa, Home Assistant…) crie uma automação/cena "ligar" e outra "desligar",
+  copie o link de cada uma e cole aqui. Se usa <b>Home Assistant</b>, dá pra usar o modo HA mais abaixo.
+</div>
+
+<div class="barra"><h2>Aparelhos</h2></div>
+<div id="lista"></div>
+<button class="prim" id="add">+ Adicionar aparelho</button>
+
+<details>
+  <summary>Usar Home Assistant (opcional)</summary>
+  <label>Endereço do Home Assistant (precisa estar acessível pela internet, ex.: Nabu Casa)</label>
+  <input id="haUrl" placeholder="https://xxxx.ui.nabu.casa">
+  <label>Token de acesso (Long-Lived Access Token)</label>
+  <input id="haToken" type="password" placeholder="cole o token aqui">
+  <p class="tag" style="margin-top:8px">Nos aparelhos do tipo "Home Assistant", preencha a <b>entidade</b> (ex.: <code>light.sala</code>, <code>media_player.tv</code>).</p>
+</details>
+
+<div class="acoes">
+  <button class="prim" id="salvar">💾 Salvar tudo</button>
+  <button id="exportar">Copiar para o Render (nuvem)</button>
+</div>
+
+<details id="boxEnv" style="display:none">
+  <summary>CASA_JSON — cole isto no Render para a config não se perder</summary>
+  <p class="tag">Render → seu serviço → Environment → Add Variable → nome <code>CASA_JSON</code> → valor abaixo.</p>
+  <pre id="env"></pre>
+</details>
+
+<div id="msg"></div>
+
+<template id="tpl">
+  <div class="cartao disp">
+    <div class="lin">
+      <div class="col"><label>Nome (como você vai falar)</label><input class="nome" placeholder="luz da sala"></div>
+      <div class="col" style="flex:0 0 160px"><label>Tipo</label>
+        <select class="tipo"><option value="webhook">Link (webhook)</option><option value="ha">Home Assistant</option></select>
+      </div>
+    </div>
+    <div class="campos-webhook">
+      <div class="lin">
+        <div class="col"><label>Link para LIGAR</label><input class="ligar" placeholder="https://..."></div>
+        <div class="col"><label>Link para DESLIGAR</label><input class="desligar" placeholder="https://..."></div>
+        <div class="col" style="flex:0 0 120px"><label>Método</label><select class="metodo"><option>POST</option><option>GET</option></select></div>
+      </div>
+    </div>
+    <div class="campos-ha" style="display:none">
+      <label>Entidade do Home Assistant</label><input class="entidade" placeholder="light.sala">
+    </div>
+    <div class="acoes">
+      <button class="testarL">▶ Testar ligar</button>
+      <button class="testarD">▶ Testar desligar</button>
+      <button class="rem">Remover</button>
+    </div>
+  </div>
+</template>
+
+<script>
+const $ = s => document.querySelector(s);
+const lista = $('#lista'), tpl = $('#tpl');
+function msg(t){ const m=$('#msg'); m.textContent=t; m.classList.add('ver'); clearTimeout(m._t); m._t=setTimeout(()=>m.classList.remove('ver'),2200); }
+
+function novoCartao(d={}) {
+  const no = tpl.content.cloneNode(true);
+  const el = no.querySelector('.disp');
+  el.querySelector('.nome').value = d.nome||'';
+  el.querySelector('.tipo').value = d.tipo||'webhook';
+  el.querySelector('.ligar').value = d.ligar||'';
+  el.querySelector('.desligar').value = d.desligar||'';
+  el.querySelector('.metodo').value = d.metodo||'POST';
+  el.querySelector('.entidade').value = d.entidade||'';
+  const mostrar = () => {
+    const ha = el.querySelector('.tipo').value === 'ha';
+    el.querySelector('.campos-ha').style.display = ha?'block':'none';
+    el.querySelector('.campos-webhook').style.display = ha?'none':'block';
+  };
+  el.querySelector('.tipo').onchange = mostrar; mostrar();
+  el.querySelector('.rem').onclick = () => el.remove();
+  el.querySelector('.testarL').onclick = () => testar(el,'ligar');
+  el.querySelector('.testarD').onclick = () => testar(el,'desligar');
+  lista.appendChild(no);
+}
+function coletar() {
+  const dispositivos = [...document.querySelectorAll('.disp')].map(el => ({
+    nome: el.querySelector('.nome').value.trim(),
+    tipo: el.querySelector('.tipo').value,
+    ligar: el.querySelector('.ligar').value.trim(),
+    desligar: el.querySelector('.desligar').value.trim(),
+    metodo: el.querySelector('.metodo').value,
+    entidade: el.querySelector('.entidade').value.trim()
+  })).filter(d => d.nome);
+  return { dispositivos, ha: { url: $('#haUrl').value.trim(), token: $('#haToken').value.trim() } };
+}
+async function salvar() {
+  const r = await fetch('/api/casa', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(coletar()) });
+  const d = await r.json();
+  if (d.ok) msg('Salvo! O Jarvis já obedece.'); else msg('Erro ao salvar');
+}
+async function testar(el, acao) {
+  // salva antes para o servidor ter o aparelho
+  await fetch('/api/casa', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(coletar()) });
+  const nome = el.querySelector('.nome').value.trim();
+  if (!nome) return msg('Dê um nome ao aparelho');
+  const r = await fetch('/api/casa/testar', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ acao, alvo: nome }) });
+  const d = await r.json();
+  msg(d.ok ? `OK: ${acao} ${nome}` : `Falhou: ${d.falhas?.[0]?.erro || d.motivo || 'erro'}`);
+}
+$('#add').onclick = () => novoCartao();
+$('#salvar').onclick = salvar;
+$('#exportar').onclick = () => { $('#boxEnv').style.display='block'; $('#boxEnv').open=true; $('#env').textContent = JSON.stringify(coletar()); msg('Copie o texto e cole no Render'); };
+
+(async () => {
+  try {
+    const d = await (await fetch('/api/casa')).json();
+    $('#haUrl').value = d.ha?.url || '';
+    (d.dispositivos||[]).forEach(novoCartao);
+  } catch {}
+  if (!lista.children.length) novoCartao({ nome:'luz da sala' });
+})();
+</script>
+</body>
+</html>
