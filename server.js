@@ -94,7 +94,7 @@ const fila = new Map();       // id -> pedido
 const respostas = new Map();  // id -> resposta
 let ultimaLeituraMuse = 0;
 // Padrão: MODO RÁPIDO (Muse desligado, cérebro é o Groq). Para usar o Muse, defina MUSE_MODO=ligado.
-const museOnline = () => process.env.MUSE_MODO === 'ligado' && Date.now() - ultimaLeituraMuse < 30000;
+const museOnline = () => Date.now() - ultimaLeituraMuse < 30000; // fila lida recentemente = Muse ativo
 const novoId = () => Math.random().toString(36).slice(2, 10);
 
 function enfileirar(text, language) {
