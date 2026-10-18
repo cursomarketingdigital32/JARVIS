@@ -387,17 +387,7 @@ app.post('/api/chat', async (req, res) => {
   const msgs = montarMensagens(texto, history);
   let ultimoErro = '';
 
-  // 1) MUSE (eu, o Jarvis) — cérebro principal
-  if (museOnline()) {
-    const r = await esperarMuse(enfileirar(texto), Number(process.env.MUSE_ESPERA_MS || 45000));
-    if (r && r.response) {
-      log('🧠 muse:', r.response);
-      return res.json({ fala: r.response, acao: r.control || null, audio_url: r.audio_url || null, cerebro: 'muse' });
-    }
-    log('⚠️  Muse não respondeu a tempo, usando cérebro reserva rápido');
-  }
-
-  // 2) cérebros reserva (rápidos) em ordem, até um funcionar — sem erro nunca
+  // 1) Groq (rápido, com o conhecimento do Jarvis) — responde em segundos
   for (const c of cerebros) {
     try {
       return res.json(await usarCerebro(c, msgs));
@@ -405,6 +395,16 @@ app.post('/api/chat', async (req, res) => {
       ultimoErro = `${c.nome}: ${e.message}`;
       log('❌', ultimoErro);
     }
+  }
+
+  // 2) MUSE (eu) — se o rápido falhar
+  if (museOnline()) {
+    const r = await esperarMuse(enfileirar(texto), Number(process.env.MUSE_ESPERA_MS || 45000));
+    if (r && r.response) {
+      log('🧠 muse:', r.response);
+      return res.json({ fala: r.response, acao: r.control || null, audio_url: r.audio_url || null, cerebro: 'muse' });
+    }
+    log('⚠️  Muse não respondeu a tempo');
   }
   if (rapida) return res.json({ ...rapida, cerebro: 'local' });
   const det = ultimoErro || groqErro || '';
@@ -710,7 +710,7 @@ app.get('/api/health', (req, res) => {
     onde: NA_NUVEM ? 'nuvem' : 'computador',
     dono: NOME_DONO,
     muse: { conectado: museOnline(), pedidos_na_fila: fila.size },
-    cerebro: museOnline() ? 'muse' : (cerebros[0] || 'nenhum'),
+    cerebro: (cerebros[0] || 'nenhum'),
     cerebros_reserva: cerebros,
     voz_piper: piperExiste(),
     voz_motor: vozMotor(),
