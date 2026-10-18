@@ -239,7 +239,7 @@ async function lerSaude() {
   try {
     saude = await (await fetch('/api/health', { cache: 'no-store' })).json();
     $('hudCerebro').textContent = (saude.cerebro || 'nenhum').toUpperCase();
-    $('hudVoz').textContent = mudo ? 'MUDO' : ({ eleven: 'PREMIUM', faber: 'FABER' }[saude.voz_motor] || 'NAVEGADOR');
+    $('hudVoz').textContent = mudo ? 'MUDO' : 'JARVIS';
     $('hudOnde').textContent = saude.onde === 'computador' ? 'PC LOCAL' : 'NUVEM';
     $('hudSisTitulo').textContent = saude.onde === 'computador' ? 'Sistema · PC' : 'Sistema · Servidor';
   } catch { $('hudOnde').textContent = 'OFFLINE'; }
@@ -566,7 +566,9 @@ async function falar(texto, audioUrl) {
   legendaJarvis(texto); // o texto aparece na hora; a voz chega em seguida
   try {
     let url = audioUrl, local = false;
-    if (!url) url = await minhaVoz(texto, 100000); // minha voz (ponte XTTS), até 100s
+    // modo ligação (mic ativo): conversa precisa de velocidade — pula minha voz lenta
+    // modo texto: usa minha voz clonada (qualidade)
+    if (!url && !ativo) url = await minhaVoz(texto, 100000); // minha voz (ponte XTTS), até 100s
     if (!url && saude.voz_motor && saude.voz_motor !== 'navegador') {
       const r = await fetch('/api/tts', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ text: texto }) });
       if (!r.ok) throw new Error('tts');
@@ -652,7 +654,7 @@ if ('speechSynthesis' in window) speechSynthesis.onvoiceschanged = () => {};
 function atualizarMudo() {
   el.mudo.classList.toggle('ativo', mudo);
   document.getElementById('ondas').style.display = mudo ? 'none' : '';
-  $('hudVoz').textContent = mudo ? 'MUDO' : ({ eleven: 'PREMIUM', faber: 'FABER' }[saude.voz_motor] || 'NAVEGADOR');
+  $('hudVoz').textContent = mudo ? 'MUDO' : 'JARVIS';
 }
 atualizarMudo();
 
@@ -718,8 +720,7 @@ el.inicio.onclick = async () => {
   garantirAudio();
   await lerSaude();
   somInicio();
-  lerPainel(); // só atualiza o visual (clima/cotação no HUD); o clima só é FALADO se ele perguntar
-  await falar('Senhor, estou ativo.');
+  lerPainel(); // só atualiza o visual; sem saudação falada — ele fala quando o senhor falar
   ligar();
 };
 // ════════════════════════════════════════════════════════════════
@@ -728,7 +729,7 @@ el.inicio.onclick = async () => {
 async function lerPainel() {
   try {
     const p = await (await fetch('/api/painel', { cache: 'no-store' })).json();
-    if (p.clima) $('hudClima').textContent = `${p.clima.cidade.split(',')[0]} ${p.clima.agora.temperatura}° · ${p.clima.agora.condicao}`;
+    // cidade/clima ocultos do HUD a pedido do senhor (clima só quando perguntar)
     if (p.cotacao) {
       const f = (c, k, casas) => { const q = p.cotacao[c]; if (!q) return ''; const s = q.variacao_pct >= 0 ? '▲' : '▼'; return `${k} ${q.valor_reais.toLocaleString('pt-BR', { maximumFractionDigits: casas })} ${s}${Math.abs(q.variacao_pct).toLocaleString('pt-BR', { minimumFractionDigits: 1, maximumFractionDigits: 1 })}%`; };
       $('hudCot').textContent = [f('USD', 'USD', 2), f('BTC', 'BTC', 0)].filter(Boolean).join('  ·  ');
