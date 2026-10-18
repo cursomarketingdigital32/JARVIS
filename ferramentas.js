@@ -8,10 +8,25 @@ import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
 
-const pegar = async (url, tipo = 'json') => {
-  const r = await fetch(url, { headers: { 'User-Agent': 'JARVIS/2.0 (assistente pessoal)' }, signal: AbortSignal.timeout(9000) });
-  if (!r.ok) throw new Error(`HTTP ${r.status}`);
-  return tipo === 'json' ? r.json() : r.text();
+const pegar = async (url, tipo = 'json', tentativas = 3) => {
+  let ultimoErro = null;
+  for (let t = 0; t < tentativas; t++) {
+    try {
+      const r = await fetch(url, { headers: { 'User-Agent': 'JARVIS/2.0 (assistente pessoal)' }, signal: AbortSignal.timeout(12000) });
+      if (r.status === 429 && t < tentativas - 1) { // rate limit: espera e tenta de novo
+        await new Promise(rr => setTimeout(rr, Math.min(8000, 1500 * Math.pow(2, t))));
+        continue;
+      }
+      if (!r.ok) throw new Error(`HTTP ${r.status}`);
+      return tipo === 'json' ? r.json() : r.text();
+    } catch (e) {
+      ultimoErro = e;
+      if (t < tentativas - 1 && /HTTP 429|timeout|timed out|fetch failed|network/i.test(e.message || ''))
+        await new Promise(rr => setTimeout(rr, 900 * (t + 1)));
+      else throw e;
+    }
+  }
+  throw ultimoErro;
 };
 
 // ── CLIMA ──────────────────────────────────────────────────────
@@ -22,13 +37,23 @@ const CODIGOS = {
   80: 'pancadas de chuva', 81: 'pancadas de chuva', 82: 'pancadas fortes de chuva', 95: 'trovoadas', 96: 'trovoadas com granizo', 99: 'trovoadas com granizo'
 };
 const cacheGeo = new Map();
+// coordenadas conhecidas: se a geocodificação falhar (ex.: rate limit), usa direto
+const COORDS_CONHECIDAS = {
+  'são josé dos campos': { latitude: -23.17944, longitude: -45.88694, name: 'São José dos Campos', admin1: 'São Paulo' },
+  'sao jose dos campos': { latitude: -23.17944, longitude: -45.88694, name: 'São José dos Campos', admin1: 'São Paulo' }
+};
 export async function clima(cidade) {
   cidade = String(cidade || '').trim() || process.env.CIDADE_PADRAO || 'São José dos Campos';
   let geo = cacheGeo.get(cidade.toLowerCase());
   if (!geo) {
-    const g = await pegar(`https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(cidade)}&count=1&language=pt&format=json`);
-    if (!g.results?.length) return { erro: `cidade "${cidade}" não encontrada` };
-    geo = g.results[0];
+    try {
+      const g = await pegar(`https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(cidade)}&count=1&language=pt&format=json`);
+      if (!g.results?.length) return { erro: `cidade "${cidade}" não encontrada` };
+      geo = g.results[0];
+    } catch (e) {
+      geo = COORDS_CONHECIDAS[cidade.toLowerCase()] || null;
+      if (!geo) return { erro: `falha ao consultar: ${e.message}` };
+    }
     cacheGeo.set(cidade.toLowerCase(), geo);
   }
   const d = await pegar(`https://api.open-meteo.com/v1/forecast?latitude=${geo.latitude}&longitude=${geo.longitude}` +
