@@ -117,6 +117,12 @@
   #hudTimers div.fim { animation: piscar .5s infinite; }
   #hudTela div { margin-top: 6px; color: var(--azul); font-size: 13px; }
 
+  /* ── Player de música (YouTube embutido, abre sozinho) ── */
+  #playerYT { display: none; position: fixed; inset: 0; z-index: 30; background: #000; }
+  #playerYT.aberto { display: block; }
+  #frameYT { position: absolute; inset: 0; width: 100%; height: 100%; border: 0; }
+  #fecharYT { position: absolute; top: max(14px, env(safe-area-inset-top)); right: 16px; z-index: 31; background: rgba(8,18,38,.85); color: var(--azul); border: 1px solid var(--azul-fraco); font-family: 'Rajdhani', sans-serif; letter-spacing: .18em; font-size: 12px; padding: 9px 16px; border-radius: 30px; cursor: pointer; }
+
   /* legenda palavra por palavra */
   #legJarvis .w { opacity: .3; transition: opacity .12s; }
   #legJarvis .w.dita { opacity: 1; }
@@ -178,6 +184,11 @@
   <button class="ponto" id="btnCasa" title="Casa inteligente — aparelhos" aria-label="Casa inteligente"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M3 11l9-8 9 8"/><path d="M5 10v10h14V10"/><path d="M9 20v-6h6v6"/></svg></button>
   <button class="ponto" id="btnModo" title="Trocar interface (I)" aria-label="Trocar interface"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M12 3 2 8l10 5 10-5-10-5z"/><path d="m2 13 10 5 10-5"/></svg></button>
   <span class="mini"></span>
+</div>
+
+<div id="playerYT">
+  <button id="fecharYT">✕ FECHAR</button>
+  <iframe id="frameYT" title="Música" allow="autoplay; encrypted-media; picture-in-picture" allowfullscreen></iframe>
 </div>
 
 <div id="inicio"><div><h1>J.A.R.V.I.S.</h1><p>Toque para iniciar</p></div></div>
@@ -490,6 +501,9 @@ async function executarAcao(a) {
     if (a.sub === 'vigiar') return vigiarTela();
     return descreverTela(a.pergunta || '');
   }
+  // YouTube: toca embutido no próprio painel (o navegador bloqueia abrir
+  // nova aba sozinho; embutido ele abre e toca automaticamente)
+  if (a.tipo === 'youtube') return tocarYouTube(a.termo || a.url);
   const url = urlDaAcao(a);
   if (saude.comandos_pc) {
     try {
@@ -891,6 +905,20 @@ async function alternarTela() {
 }
 $('btnTela').onclick = alternarTela;
 $('btnCasa').onclick = () => { location.href = 'casa.html'; };
+
+// ── YouTube embutido: abre e toca sozinho, sem precisar de nova aba ──
+function tocarYouTube(termoOuUrl) {
+  const t = String(termoOuUrl || '');
+  const m = t.match(/(?:youtube\.com\/watch\?v=|youtu\.be\/)([\w-]{6,})/i);
+  const src = m
+    ? 'https://www.youtube.com/embed/' + m[1] + '?autoplay=1&rel=0'
+    : t ? 'https://www.youtube.com/embed?listType=search&list=' + encodeURIComponent(t) + '&autoplay=1&rel=0' : '';
+  if (!src) return;
+  $('frameYT').src = src;
+  $('playerYT').classList.add('aberto');
+}
+function fecharYouTube() { $('frameYT').src = 'about:blank'; $('playerYT').classList.remove('aberto'); }
+$('fecharYT').onclick = fecharYouTube;
 
 mudarEstado('espera');
 </script>
