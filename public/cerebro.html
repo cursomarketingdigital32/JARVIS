@@ -209,7 +209,7 @@ function fallbackVoz(texto) {
 async function send() {
   if (!ativo) return;
   const blob = new Blob(chunks, { type: 'audio/webm' });
-  if (blob.size < 15000) { loop(); return; }
+  if (blob.size < 5000) { statusEl.textContent = 'fale mais alto / mais perto'; energy = 0.9; loop(); return; }
   statusEl.textContent = 'processando...';
   energy = 0.6;
   try {
