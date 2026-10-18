@@ -220,12 +220,26 @@ async function send() {
     const txt = (d.text || '').trim();
     if (!txt) { statusEl.textContent = 'ouvindo...'; energy = 0.9; loop(); return; }
     statusEl.textContent = 'Você: ' + txt;
-    const r2 = await fetch('/api/muse-brain', {
+    // Enfileira (retorna rápido) e aguarda a resposta por polling curto
+    const r2 = await fetch('/api/muse-brain/async', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ text: txt })
     });
-    const d2 = await r2.json();
+    const d2a = await r2.json();
+    const reqId = d2a.id;
+    if (!reqId) throw new Error('sem id');
+    statusEl.textContent = 'pensando...';
+    let d2 = null;
+    for (let i = 0; i < 40; i++) {
+      await new Promise(r => setTimeout(r, 3000));
+      if (!ativo) return;
+      const rr = await fetch('/api/muse-brain/result/' + reqId);
+      const dd = await rr.json();
+      if (dd.ready) { d2 = dd; break; }
+      statusEl.textContent = 'pensando' + '.'.repeat((i % 3) + 1);
+    }
+    if (!d2) throw new Error('timeout resposta');
     const resp = (d2.response || '').trim();
     if (resp) {
       statusEl.textContent = 'Jarvis: ' + resp;
