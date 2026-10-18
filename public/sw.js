@@ -1,3 +1,4 @@
+
 // Service worker do J.A.R.V.I.S. — deixa o app abrir rápido no celular,
 // mesmo enquanto o servidor da nuvem acorda. NUNCA guarda respostas de /api.
 const CACHE = 'jarvis-v7';

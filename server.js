@@ -1,3 +1,4 @@
+
 // ═══════════════════════════════════════════════════════════════
 //  J.A.R.V.I.S. — servidor único (roda no PC e na nuvem / Render)
 //  - Cérebro: Muse (se estiver conectado) → Groq → Gemini → OpenAI
@@ -28,7 +29,7 @@ try {
 
 const NA_NUVEM = !!(process.env.RENDER || process.env.NA_NUVEM);
 const NOME_DONO = process.env.NOME_DONO || 'senhor';
-const CIDADE = process.env.CIDADE_PADRAO || 'Maceió';
+const CIDADE = process.env.CIDADE_PADRAO || 'São José dos Campos';
 
 const app = express();
 app.set('trust proxy', true);
@@ -86,7 +87,7 @@ Sem ação: "acao": null.`;
 //  o Jarvis usa a IA reserva (Groq/Gemini/OpenAI) e não trava mais.
 // ═══════════════════════════════════════════════════════════════
 const fila = new Map();       // id -> pedido
-const respostas = new Map();  // id -> resposta
+const respostas = new Map();  // id -> { response, audio_url, control, ts }
 let ultimaLeituraMuse = 0;
 const museOnline = () => process.env.MUSE_MODO !== 'desligado' && Date.now() - ultimaLeituraMuse < 30000;
 const novoId = () => Math.random().toString(36).slice(2, 10);
@@ -118,7 +119,7 @@ app.post('/api/muse-brain/respond', (req, res) => {
   const { id, response, audio_url, control } = req.body || {};
   if (!id) return res.status(400).json({ error: 'id required' });
   ultimaLeituraMuse = Date.now();
-  respostas.set(id, { response, audio_url, control });
+  respostas.set(id, { response, audio_url, control, ts: Date.now() });
   fila.delete(id);
   res.json({ ok: true });
 });
@@ -133,8 +134,14 @@ app.get('/api/muse-brain/result/:id', (req, res) => {
   const r = respostas.get(req.params.id);
   if (!r) return res.json({ ready: false });
   respostas.delete(req.params.id);
-  res.json({ ready: true, ...r });
+  const { ts, ...limpa } = r;
+  res.json({ ready: true, ...limpa });
 });
+// limpa respostas atrasadas que ninguém buscou (a cada 5 min, remove as com +10 min)
+setInterval(() => {
+  const agora = Date.now();
+  for (const [k, v] of respostas) if (agora - (v.ts || 0) > 600000) respostas.delete(k);
+}, 300000);
 app.post('/api/muse-brain', async (req, res) => {
   const { text, language } = req.body || {};
   if (!text) return res.status(400).json({ error: 'text required' });
@@ -174,8 +181,9 @@ async function chatEstiloOpenAI(url, chave, modelo, msgs) {
 }
 
 // Groq com vários modelos: se um estiver fora do ar/descontinuado, tenta o próximo
+// (atualizado em 18/10/2026: os modelos Llama 3.x/Gemma foram desligados pelo Groq)
 const GROQ_MODELOS = (process.env.GROQ_MODELO ? [process.env.GROQ_MODELO] : [])
-  .concat(['llama-3.3-70b-versatile', 'meta-llama/llama-4-maverick-17b-128e-instruct', 'llama-3.1-8b-instant', 'gemma2-9b-it']);
+  .concat(['openai/gpt-oss-120b', 'openai/gpt-oss-20b', 'qwen/qwen3.8-27b']);
 let groqErro = '';
 async function chatGroq(msgs) {
   let ultimo = '';
@@ -295,6 +303,22 @@ function falaCasa(r, cmd) {
   return { fala: `${verbo} ${alvoTxt}, ${dono}.${resto}`, acao: null };
 }
 
+// Tenta um cérebro (principal ou reserva): loop de ferramentas + ação de casa.
+// Retorna o corpo da resposta ou lança erro para o próximo da fila tentar.
+async function usarCerebro(c, msgs) {
+  const r = await pensarComFerramentas(c, msgs);
+  let fala = String(r?.fala || r?.resposta || r?.response || '').trim();
+  // ação de casa vinda do cérebro: executa no servidor
+  if (r.acao && r.acao.tipo === 'casa') {
+    const rc = await casa.acionar(r.acao.acao, r.acao.alvo || r.acao.aparelho || 'tudo');
+    const fc = falaCasa(rc, { acao: r.acao.acao, alvo: r.acao.alvo });
+    return { ...fc, cerebro: c.nome };
+  }
+  if (!fala) throw new Error('resposta vazia');
+  log(`🧠 ${c.nome}:`, fala, r.acao ? JSON.stringify(r.acao) : '');
+  return { fala, acao: r.acao || null, cerebro: c.nome, ferramentas: r.ferramentas };
+}
+
 app.post('/api/chat', async (req, res) => {
   const { text, history } = req.body || {};
   const texto = String(text || '').trim();
@@ -315,42 +339,42 @@ app.post('/api/chat', async (req, res) => {
   if (/\b(liga|ligar|ligue|acende|desliga|desligar|apaga)\b/i.test(texto) && /\b(luz|lâmpada|lampada|tv|televis|tomada|ar.?condicionado|ventilador|abajur)\b/i.test(texto) && !casa.listar().length)
     return res.json({ fala: `${NOME_DONO[0].toUpperCase() + NOME_DONO.slice(1)}, ainda não cadastrei seus aparelhos. Abra a tela "Casa" (botão da casinha) e adicione a luz, a TV e o que mais quiser controlar.`, acao: null, cerebro: 'casa' });
 
-  // 1) Muse, se estiver conectado lendo a fila
+  // 1) cérebro principal (Gemini por padrão; CEREBRO_PRINCIPAL escolhe outro)
+  const rapida = respostaRapida(texto);
+  const cerebros = cerebrosDisponiveis();
+  if (!cerebros.length) {
+    if (rapida) return res.json({ ...rapida, cerebro: 'local' });
+    return res.json({
+      fala: `${NOME_DONO[0].toUpperCase() + NOME_DONO.slice(1)}, meu cérebro está desligado. Configure a chave GEMINI_API_KEY (grátis em aistudio.google.com) ou GROQ_API_KEY para eu poder pensar.`,
+      acao: null, cerebro: 'nenhum', erro: 'sem_chave'
+    });
+  }
+  const msgs = montarMensagens(texto, history);
+  let ultimoErro = '';
+  const principal = cerebros[0];
+  if (principal) {
+    try {
+      return res.json(await usarCerebro(principal, msgs));
+    } catch (e) {
+      ultimoErro = `${principal.nome}: ${e.message}`;
+      log('❌', ultimoErro);
+    }
+  }
+
+  // 2) Muse, se estiver conectado lendo a fila
   if (museOnline()) {
     const r = await esperarMuse(enfileirar(texto), Number(process.env.MUSE_ESPERA_MS || 25000));
     if (r && r.response) {
       log('🧠 muse:', r.response);
       return res.json({ fala: r.response, acao: r.control || null, audio_url: r.audio_url || null, cerebro: 'muse' });
     }
-    log('⚠️  Muse não respondeu a tempo, usando IA reserva');
+    log('⚠️  Muse não respondeu a tempo, tentando o próximo cérebro');
   }
 
-  const rapida = respostaRapida(texto);
-  const cerebros = cerebrosDisponiveis();
-  if (!cerebros.length) {
-    if (rapida) return res.json({ ...rapida, cerebro: 'local' });
-    return res.json({
-      fala: `${NOME_DONO[0].toUpperCase() + NOME_DONO.slice(1)}, meu cérebro está desligado. Configure a chave GROQ_API_KEY para eu poder pensar.`,
-      acao: null, cerebro: 'nenhum', erro: 'sem_chave'
-    });
-  }
-
-  // 2) IAs reserva, em ordem, até uma funcionar
-  const msgs = montarMensagens(texto, history);
-  let ultimoErro = '';
-  for (const c of cerebros) {
+  // 3) demais cérebros em ordem, até um funcionar
+  for (const c of cerebros.slice(1)) {
     try {
-      const r = await pensarComFerramentas(c, msgs);
-      let fala = String(r?.fala || r?.resposta || r?.response || '').trim();
-      // ação de casa vinda do cérebro: executa no servidor
-      if (r.acao && r.acao.tipo === 'casa') {
-        const rc = await casa.acionar(r.acao.acao, r.acao.alvo || r.acao.aparelho || 'tudo');
-        const fc = falaCasa(rc, { acao: r.acao.acao, alvo: r.acao.alvo });
-        return res.json({ ...fc, cerebro: c.nome });
-      }
-      if (!fala) throw new Error('resposta vazia');
-      log(`🧠 ${c.nome}:`, fala, r.acao ? JSON.stringify(r.acao) : '');
-      return res.json({ fala, acao: r.acao || null, cerebro: c.nome, ferramentas: r.ferramentas });
+      return res.json(await usarCerebro(c, msgs));
     } catch (e) {
       ultimoErro = `${c.nome}: ${e.message}`;
       log('❌', ultimoErro);
@@ -360,7 +384,7 @@ app.post('/api/chat', async (req, res) => {
   const det = ultimoErro || groqErro || '';
   const chaveRuim = /401|invalid|api key|unauthor|no api key/i.test(det);
   const falaErro = chaveRuim
-    ? `${NOME_DONO[0].toUpperCase() + NOME_DONO.slice(1)}, minha chave de acesso foi recusada. Confira a GROQ_API_KEY.`
+    ? `${NOME_DONO[0].toUpperCase() + NOME_DONO.slice(1)}, minha chave de acesso foi recusada. Confira a GEMINI_API_KEY ou a GROQ_API_KEY.`
     : `Desculpe, ${NOME_DONO}, meu cérebro não respondeu. Tente de novo em instantes.`;
   res.json({ fala: falaErro, acao: null, cerebro: 'erro', erro: chaveRuim ? 'chave_invalida' : 'falha', detalhe: det });
 });
@@ -501,7 +525,7 @@ app.post('/api/visao', async (req, res) => {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${chave}` },
       body: JSON.stringify({
-        model: process.env.GROQ_VISAO_MODELO || 'meta-llama/llama-4-scout-17b-16e-instruct',
+        model: process.env.GROQ_VISAO_MODELO || 'qwen/qwen3.8-27b',
         temperature: 0.4, max_tokens: 220,
         messages: [
           { role: 'system', content: `Você é o J.A.R.V.I.S., assistente do ${NOME_DONO}. Fale português do Brasil, chame-o de "${NOME_DONO}". Sua resposta é falada em voz alta: no máximo 2 frases, sem listas nem markdown. Descreva só o que realmente aparece na imagem; não invente. Se a imagem estiver ilegível, diga isso.` },
@@ -660,7 +684,7 @@ app.get('/api/health', (req, res) => {
     onde: NA_NUVEM ? 'nuvem' : 'computador',
     dono: NOME_DONO,
     muse: { conectado: museOnline(), pedidos_na_fila: fila.size },
-    cerebro: museOnline() ? 'muse' : (cerebros[0] || 'nenhum'),
+    cerebro: (cerebros[0] || 'nenhum'),
     cerebros_reserva: cerebros,
     voz_piper: piperExiste(),
     voz_motor: vozMotor(),
