@@ -361,7 +361,7 @@ app.post('/api/chat', async (req, res) => {
 
   // 1) Muse, se estiver conectado lendo a fila
   if (museOnline()) {
-    const r = await esperarMuse(enfileirar(texto), Number(process.env.MUSE_ESPERA_MS || 3000));
+    const r = await esperarMuse(enfileirar(texto), Number(process.env.MUSE_ESPERA_MS || 1500));
     if (r && r.response) {
       log('🧠 muse:', r.response);
       return res.json({ fala: r.response, acao: r.control || null, audio_url: r.audio_url || null, cerebro: 'muse' });
