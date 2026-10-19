@@ -454,6 +454,32 @@ async function processar(texto, deVoz) {
   legendaJarvis('');
   el.link.style.display = 'none';
   mudarEstado('pensando');
+  // OLHO DO JARVIS: se a câmera estiver ativa, identifica o que ela vê (como a Tera)
+  try {
+    if (window.Visual && Visual.cameraAtiva && Visual.cameraAtiva()) {
+      const foto = Visual.capturarCamera();
+      if (foto) {
+        mudarEstado('pensando', 'IDENTIFICANDO OBJETOS');
+        const rv = await fetch('/api/visao', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ imagem: foto, pergunta: texto })
+        });
+        const dv = await rv.json();
+        const desc = (dv.descricao || '').trim();
+        if (rv.ok && desc) {
+          historico.push({ role: 'user', content: texto + ' [foto da câmera]' }, { role: 'assistant', content: desc });
+          historico = historico.slice(-16);
+          try { localStorage.setItem('jarvis_hist', JSON.stringify(historico)); } catch {}
+          if ($('hudCerebro')) $('hudCerebro').textContent = 'VISÃO';
+          await falar(desc);
+          janelaConversa = Date.now() + 12000;
+          processando = false;
+          voltarAOuvir();
+          return;
+        }
+      }
+    }
+  } catch (e) { /* cai para o chat normal */ }
   try {
     const r = await fetch('/api/chat', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
