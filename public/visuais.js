@@ -909,6 +909,15 @@ const camera = (() => {
   }
   return {
     alternarCamera() { usandoTras = !usandoTras; if (estadoCam === 'ligado' || estadoCam === 'abrindo') { fechar(); abrir(); } },
+    capturar() {
+      if (estadoCam !== 'ligado' || !video || !video.videoWidth) return null;
+      const maxL = 960, esc = Math.min(1, maxL / video.videoWidth);
+      const cv = document.createElement('canvas');
+      cv.width = Math.round(video.videoWidth * esc); cv.height = Math.round(video.videoHeight * esc);
+      cv.getContext('2d').drawImage(video, 0, 0, cv.width, cv.height);
+      return cv.toDataURL('image/jpeg', 0.6);
+    },
+    ativa() { return estadoCam === 'ligado'; },
     entrar() { t0 = tempo; abrir(); },
     sair() { fechar(); },
     redim() {},
@@ -1029,6 +1038,8 @@ window.Visual = {
     return nome;
   },
   alternarCamera() { if (nomeModo === 'camera') camera.alternarCamera(); },
+  capturarCamera() { return camera.capturar ? camera.capturar() : null; },
+  cameraAtiva() { return nomeModo === 'camera' && camera.ativa && camera.ativa(); },
   atual: () => nomeModo
 };
 })();
