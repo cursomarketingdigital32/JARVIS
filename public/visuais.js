@@ -924,44 +924,44 @@ const camera = (() => {
         g.globalAlpha = 1; g.drawImage(video, (L - dw) / 2, (A - dh) / 2, dw, dh);
         g.restore();
         // leve tom ciano por cima
-        g.fillStyle = `rgba(20,60,90,${.18 + .12 * Math.sin(t * .5)})`; g.fillRect(0, 0, L, A);
+        g.fillStyle = `rgba(60,20,90,${.18 + .12 * Math.sin(t * .5)})`; g.fillRect(0, 0, L, A);
       }
       const CX = L / 2, CY = A * .45;
       g.globalCompositeOperation = 'lighter';
       // linha de varredura descendo
       const sy = (t * .22 % 1) * A;
       const lg = g.createLinearGradient(0, sy - 40, 0, sy + 40);
-      lg.addColorStop(0, 'rgba(95,230,255,0)'); lg.addColorStop(.5, `rgba(95,230,255,${.25 + n * .3})`); lg.addColorStop(1, 'rgba(95,230,255,0)');
+      lg.addColorStop(0, 'rgba(190,110,255,0)'); lg.addColorStop(.5, `rgba(190,110,255,${.25 + n * .3})`); lg.addColorStop(1, 'rgba(190,110,255,0)');
       g.fillStyle = lg; g.fillRect(0, sy - 40, L, 80);
       // grade sutil
-      g.strokeStyle = 'rgba(95,230,255,.06)'; g.lineWidth = 1; g.beginPath();
+      g.strokeStyle = 'rgba(190,110,255,.06)'; g.lineWidth = 1; g.beginPath();
       for (let x = 0; x <= L; x += S * .1) { g.moveTo(x, 0); g.lineTo(x, A); }
       for (let y = 0; y <= A; y += S * .1) { g.moveTo(0, y); g.lineTo(L, y); }
       g.stroke();
       // cantos (brackets)
       const m = S * .08, bl = S * .05;
-      g.strokeStyle = `rgba(95,230,255,${.6 + n * .3})`; g.lineWidth = 2;
+      g.strokeStyle = `rgba(190,110,255,${.6 + n * .3})`; g.lineWidth = 2;
       for (const [sx, sgy] of [[1, 1], [-1, 1], [1, -1], [-1, -1]]) {
         const x = sx > 0 ? m : L - m, y = sgy > 0 ? m + (L < 640 ? 70 : 0) : A - m - (L < 640 ? 90 : 0);
         g.beginPath();
         g.moveTo(x + sx * bl, y); g.lineTo(x, y); g.lineTo(x, y + sgy * bl); g.stroke();
       }
       // retículo central + anéis de HUD
-      anelHUD(CX, CY, S * .78, t, n, 1, '95,230,255');
-      g.strokeStyle = `rgba(95,230,255,${.5 + n * .4})`; g.lineWidth = 1.4;
+      anelHUD(CX, CY, S * .78, t, n, 1, '190,110,255');
+      g.strokeStyle = `rgba(190,110,255,${.5 + n * .4})`; g.lineWidth = 1.4;
       g.beginPath(); g.moveTo(CX - S * .04, CY); g.lineTo(CX + S * .04, CY);
       g.moveTo(CX, CY - S * .04); g.lineTo(CX, CY + S * .04); g.stroke();
       g.globalCompositeOperation = 'source-over';
       // textos de HUD
-      g.fillStyle = 'rgb(95,230,255)';
+      g.fillStyle = 'rgb(190,110,255)';
       g.font = `${Math.max(10, Math.round(S * .018))}px ui-monospace, Consolas, monospace`;
       g.textAlign = 'left';
-      const et = { espera: 'VISÃO ATIVA', ouvindo: 'OUVINDO', pensando: 'ANALISANDO AMBIENTE', falando: 'FALANDO' }[P.estado] || 'VISÃO';
-      g.fillText(et + '   ·   SCANNER ÓPTICO', m, A < 700 ? A - m - 60 : A - m);
+      const et = { espera: 'VISÃO NEURAL', ouvindo: 'OUVINDO', pensando: 'ANALISANDO AMBIENTE', falando: 'FALANDO' }[P.estado] || 'VISÃO';
+      g.fillText(et + '   ·   OLHO DO JARVIS', m, A < 700 ? A - m - 60 : A - m);
       if (estadoCam !== 'ligado') {
         g.textAlign = 'center';
         g.font = `${Math.max(13, Math.round(S * .028))}px 'Rajdhani', sans-serif`;
-        g.fillStyle = estadoCam === 'erro' ? '#ff9a9a' : 'rgba(95,230,255,.85)';
+        g.fillStyle = estadoCam === 'erro' ? '#ff9a9a' : 'rgba(190,110,255,.85)';
         g.fillText(estadoCam === 'erro' ? erro.toUpperCase() : 'INICIANDO CÂMERA…', CX, CY + S * .18);
         g.textAlign = 'left';
       }
