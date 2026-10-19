@@ -914,57 +914,74 @@ const camera = (() => {
     redim() {},
     desenhar(dt) {
       const t = tempo, n = P.nivel, S = Math.min(L, A);
-      g.fillStyle = '#04070e'; g.fillRect(0, 0, L, A);
-      // imagem da câmera (cobre a tela)
+      const CX = L / 2, CY = A * .42, R = S * .30;
+      // fundo escuro
+      g.fillStyle = '#060409'; g.fillRect(0, 0, L, A);
+      g.globalCompositeOperation = 'lighter';
+      // brilho roxo de fundo (aura)
+      const aura = g.createRadialGradient(CX, CY, R * .2, CX, CY, R * 2.2);
+      const pulso = .5 + .3 * Math.sin(t * 1.4) + n * .4;
+      aura.addColorStop(0, `rgba(150,60,255,${.35 * pulso})`);
+      aura.addColorStop(.5, `rgba(110,40,220,${.15 * pulso})`);
+      aura.addColorStop(1, 'rgba(60,20,120,0)');
+      g.fillStyle = aura; g.fillRect(0, 0, L, A);
+      // ORBE CENTRAL — a câmera dentro do olho
+      g.save();
+      g.beginPath(); g.arc(CX, CY, R, 0, Math.PI * 2); g.clip();
       if (estadoCam === 'ligado' && video && video.videoWidth) {
         const vw = video.videoWidth, vh = video.videoHeight;
-        const escala = Math.max(L / vw, A / vh), dw = vw * escala, dh = vh * escala;
-        g.save();
-        if (!usandoTras) { g.translate(L, 0); g.scale(-1, 1); } // espelha a câmera frontal
-        g.globalAlpha = 1; g.drawImage(video, (L - dw) / 2, (A - dh) / 2, dw, dh);
-        g.restore();
-        // leve tom ciano por cima
-        g.fillStyle = `rgba(60,20,90,${.18 + .12 * Math.sin(t * .5)})`; g.fillRect(0, 0, L, A);
+        const escala = Math.max((R * 2) / vw, (R * 2) / vh), dw = vw * escala, dh = vh * escala;
+        if (!usandoTras) { g.translate(CX * 2, 0); g.scale(-1, 1); }
+        g.globalAlpha = .92; g.drawImage(video, CX - dw / 2, CY - dh / 2, dw, dh);
+        g.globalAlpha = 1;
+      } else {
+        // orbe vazio: gradiente roxo girando
+        const og = g.createRadialGradient(CX, CY, 0, CX, CY, R);
+        og.addColorStop(0, '#2a1545'); og.addColorStop(.7, '#150a28'); og.addColorStop(1, '#0a0514');
+        g.fillStyle = og; g.fillRect(CX - R, CY - R, R * 2, R * 2);
       }
-      const CX = L / 2, CY = A * .45;
-      g.globalCompositeOperation = 'lighter';
-      // linha de varredura descendo
-      const sy = (t * .22 % 1) * A;
-      const lg = g.createLinearGradient(0, sy - 40, 0, sy + 40);
-      lg.addColorStop(0, 'rgba(190,110,255,0)'); lg.addColorStop(.5, `rgba(190,110,255,${.25 + n * .3})`); lg.addColorStop(1, 'rgba(190,110,255,0)');
-      g.fillStyle = lg; g.fillRect(0, sy - 40, L, 80);
-      // grade sutil
-      g.strokeStyle = 'rgba(190,110,255,.06)'; g.lineWidth = 1; g.beginPath();
-      for (let x = 0; x <= L; x += S * .1) { g.moveTo(x, 0); g.lineTo(x, A); }
-      for (let y = 0; y <= A; y += S * .1) { g.moveTo(0, y); g.lineTo(L, y); }
-      g.stroke();
-      // cantos (brackets)
-      const m = S * .08, bl = S * .05;
-      g.strokeStyle = `rgba(190,110,255,${.6 + n * .3})`; g.lineWidth = 2;
-      for (const [sx, sgy] of [[1, 1], [-1, 1], [1, -1], [-1, -1]]) {
-        const x = sx > 0 ? m : L - m, y = sgy > 0 ? m + (L < 640 ? 70 : 0) : A - m - (L < 640 ? 90 : 0);
-        g.beginPath();
-        g.moveTo(x + sx * bl, y); g.lineTo(x, y); g.lineTo(x, y + sgy * bl); g.stroke();
-      }
-      // retículo central + anéis de HUD
-      anelHUD(CX, CY, S * .78, t, n, 1, '190,110,255');
-      g.strokeStyle = `rgba(190,110,255,${.5 + n * .4})`; g.lineWidth = 1.4;
-      g.beginPath(); g.moveTo(CX - S * .04, CY); g.lineTo(CX + S * .04, CY);
-      g.moveTo(CX, CY - S * .04); g.lineTo(CX, CY + S * .04); g.stroke();
+      g.restore();
+      // anel do orbe (borda neon roxa)
+      g.strokeStyle = `rgba(190,110,255,${.7 + n * .3})`; g.lineWidth = 3;
+      g.beginPath(); g.arc(CX, CY, R, 0, Math.PI * 2); g.stroke();
+      // anel externo girando
+      g.strokeStyle = `rgba(150,70,255,${.35 + n * .25})`; g.lineWidth = 1.5;
+      g.setLineDash([R * .3, R * .18]);
+      g.lineDashOffset = -t * 40;
+      g.beginPath(); g.arc(CX, CY, R * 1.12, 0, Math.PI * 2); g.stroke();
+      g.setLineDash([]);
+      // anel de energia (reage à voz)
+      g.strokeStyle = `rgba(220,150,255,${.25 + n * .5})`; g.lineWidth = 2;
+      g.beginPath(); g.arc(CX, CY, R * (1.22 + n * .06), 0, Math.PI * 2); g.stroke();
       g.globalCompositeOperation = 'source-over';
-      // textos de HUD
-      g.fillStyle = 'rgb(190,110,255)';
-      g.font = `${Math.max(10, Math.round(S * .018))}px ui-monospace, Consolas, monospace`;
-      g.textAlign = 'left';
-      const et = { espera: 'VISÃO NEURAL', ouvindo: 'OUVINDO', pensando: 'ANALISANDO AMBIENTE', falando: 'FALANDO' }[P.estado] || 'VISÃO';
-      g.fillText(et + '   ·   OLHO DO JARVIS', m, A < 700 ? A - m - 60 : A - m);
-      if (estadoCam !== 'ligado') {
-        g.textAlign = 'center';
-        g.font = `${Math.max(13, Math.round(S * .028))}px 'Rajdhani', sans-serif`;
-        g.fillStyle = estadoCam === 'erro' ? '#ff9a9a' : 'rgba(190,110,255,.85)';
-        g.fillText(estadoCam === 'erro' ? erro.toUpperCase() : 'INICIANDO CÂMERA…', CX, CY + S * .18);
-        g.textAlign = 'left';
+      // TÍTULO
+      g.textAlign = 'center';
+      g.fillStyle = '#e8d5ff';
+      g.font = `600 ${Math.max(22, Math.round(S * .045))}px 'Rajdhani', sans-serif`;
+      g.fillText('JARVIS', CX, CY - R * 1.55);
+      g.fillStyle = 'rgba(190,140,255,.75)';
+      g.font = `${Math.max(10, Math.round(S * .02))}px 'Rajdhani', sans-serif`;
+      g.fillText('INTELIGÊNCIA ARTIFICIAL VISUAL NEURAL', CX, CY - R * 1.32);
+      // botão power (estilo Tera)
+      const py = CY + R * 1.45, pr = S * .035;
+      g.strokeStyle = estadoCam === 'ligado' ? 'rgba(190,110,255,.9)' : 'rgba(120,80,180,.5)';
+      g.lineWidth = 2.5;
+      g.beginPath(); g.arc(CX, py, pr, 0, Math.PI * 2); g.stroke();
+      g.beginPath(); g.moveTo(CX, py - pr * .55); g.lineTo(CX, py + pr * .1); g.stroke();
+      g.beginPath(); g.arc(CX, py, pr * .55, -Math.PI * .35, Math.PI * 1.35); g.stroke();
+      // estado
+      g.fillStyle = 'rgba(200,160,255,.8)';
+      g.font = `${Math.max(11, Math.round(S * .022))}px ui-monospace, Consolas, monospace`;
+      const et = { espera: 'TOQUE PARA FALAR', ouvindo: 'OUVINDO', pensando: 'ANALISANDO', falando: 'FALANDO' }[P.estado] || 'VISÃO NEURAL';
+      g.fillText(et, CX, py + pr * 2.2);
+      if (estadoCam === 'erro') {
+        g.fillStyle = '#ff9a9a';
+        g.fillText(erro.toUpperCase(), CX, CY + R * .5);
+      } else if (estadoCam !== 'ligado') {
+        g.fillStyle = 'rgba(200,160,255,.7)';
+        g.fillText('INICIANDO CÂMERA…', CX, CY);
       }
+      g.textAlign = 'left';
     }
   };
 })();
